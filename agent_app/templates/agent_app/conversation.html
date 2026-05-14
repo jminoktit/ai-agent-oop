@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>Conversation #{{ conversation.id }} - AI Agent OOP</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
+        h1 { margin-bottom: 1rem; color: #38bdf8; }
+        a { color: #38bdf8; text-decoration: none; }
+        .msg { margin-bottom: 1rem; max-width: 80%; }
+        .msg.user { margin-right: auto; }
+        .msg .bubble { padding: .8rem 1rem; border-radius: 1rem; line-height: 1.5; white-space: pre-wrap; }
+        .msg.user .bubble { background: #0284c7; color: white; border-bottom-left-radius: .2rem; }
+        .msg.assistant .bubble { background: #1e293b; border: 1px solid #334155; border-bottom-right-radius: .2rem; }
+        .msg .role-label { font-size: .7rem; color: #64748b; margin-bottom: .2rem; display: block; }
+        .back { display: inline-block; margin-bottom: 1rem; padding: .5rem 1rem; background: #1e293b; border-radius: .5rem; }
+    </style>
+</head>
+<body>
+    <a href="{% url 'index' %}" class="back">&larr; Back</a>
+    <h1>{{ conversation.agent_name }} - Conversation #{{ conversation.id }}</h1>
+
+    {% for msg in messages %}
+    <div class="msg {{ msg.role }}">
+        <span class="role-label">{{ msg.role }}</span>
+        <div class="bubble">{{ msg.content }}</div>
+    </div>
+    {% endfor %}
+</body>
+</html>

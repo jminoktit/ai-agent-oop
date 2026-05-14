@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent OOP</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; height: 100vh; display: flex; }
+        .sidebar { width: 260px; background: #1e293b; padding: 1rem; display: flex; flex-direction: column; border-left: 1px solid #334155; }
+        .sidebar h1 { font-size: 1.2rem; margin-bottom: 1rem; color: #38bdf8; }
+        .sidebar h2 { font-size: .8rem; text-transform: uppercase; color: #64748b; margin: 1rem 0 .5rem; }
+        .agent-btn { display: block; width: 100%; padding: .6rem .8rem; margin-bottom: .3rem; border: 1px solid #334155; border-radius: .5rem; background: #0f172a; color: #e2e8f0; cursor: pointer; text-align: right; transition: .2s; }
+        .agent-btn:hover { background: #334155; }
+        .agent-btn.active { background: #0284c7; border-color: #38bdf8; }
+        .agent-btn .badge { float: left; font-size: .7rem; background: #334155; padding: .1rem .4rem; border-radius: 1rem; }
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .header { padding: 1rem 1.5rem; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 1rem; }
+        .header .agent-label { background: #0284c7; color: white; padding: .2rem .6rem; border-radius: 1rem; font-size: .8rem; }
+        .messages { flex: 1; overflow-y: auto; padding: 1.5rem; }
+        .msg { margin-bottom: 1rem; max-width: 80%; }
+        .msg.user { margin-right: auto; }
+        .msg .bubble { padding: .8rem 1rem; border-radius: 1rem; line-height: 1.5; white-space: pre-wrap; }
+        .msg.user .bubble { background: #0284c7; color: white; border-bottom-left-radius: .2rem; }
+        .msg.assistant .bubble { background: #1e293b; border: 1px solid #334155; border-bottom-right-radius: .2rem; }
+        .msg.system .bubble { background: #1a2e3a; border: 1px solid #0e7490; color: #7dd3fc; font-size: .85rem; }
+        .msg.tool .bubble { background: #1a2e1a; border: 1px solid #166534; color: #86efac; font-size: .85rem; font-family: monospace; }
+        .msg .role-label { font-size: .7rem; color: #64748b; margin-bottom: .2rem; display: block; }
+        .input-area { padding: 1rem 1.5rem; border-top: 1px solid #334155; display: flex; gap: .5rem; align-items: flex-end; }
+        .input-area textarea { flex: 1; padding: .8rem 1rem; border: 1px solid #334155; border-radius: .5rem; background: #1e293b; color: #e2e8f0; font-size: 1rem; font-family: inherit; resize: none; min-height: 48px; max-height: 200px; line-height: 1.5; overflow-y: auto; }
+        .input-area textarea:focus { outline: none; border-color: #38bdf8; }
+        .input-area textarea::placeholder { color: #64748b; }
+        .input-area button { padding: .8rem 1.5rem; background: #0284c7; color: white; border: none; border-radius: .5rem; cursor: pointer; font-size: 1rem; align-self: stretch; }
+        .input-area button:hover { background: #0369a1; }
+        .conv-list { max-height: 250px; overflow-y: auto; }
+        .conv-item { display: flex; align-items: center; padding: .3rem .5rem; border-radius: .3rem; cursor: pointer; }
+        .conv-item:hover { background: #334155; }
+        .conv-item .conv-name { flex: 1; color: #94a3b8; text-decoration: none; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .conv-item:hover .conv-name { color: #e2e8f0; }
+        .conv-item .conv-actions { display: none; gap: .2rem; }
+        .conv-item:hover .conv-actions { display: flex; }
+        .conv-actions button { background: none; border: none; color: #64748b; cursor: pointer; font-size: .75rem; padding: .1rem .3rem; border-radius: .2rem; }
+        .conv-actions button:hover { color: #e2e8f0; background: #1e293b; }
+        .conv-actions .del:hover { color: #ef4444; }
+        .conv-actions .pin:hover { color: #facc15; }
+        .conv-item.pinned .conv-name { color: #38bdf8; }
+        .conv-item.pinned .conv-actions .pin { color: #facc15; }
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #64748b; }
+        .loading { display: none; text-align: center; padding: 1rem; color: #64748b; }
+        .tools-info { font-size: .8rem; color: #94a3b8; padding: .5rem; }
+        pre { background: #0f172a; padding: .5rem; border-radius: .3rem; overflow-x: auto; }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: #1e293b; border: 1px solid #334155; border-radius: .8rem; padding: 1.5rem; width: 350px; }
+        .modal-box h3 { margin-bottom: 1rem; color: #e2e8f0; }
+        .modal-box input { width: 100%; padding: .6rem; border: 1px solid #334155; border-radius: .4rem; background: #0f172a; color: #e2e8f0; font-size: 1rem; }
+        .modal-box input:focus { outline: none; border-color: #38bdf8; }
+        .modal-actions { display: flex; gap: .5rem; margin-top: 1rem; justify-content: flex-end; }
+        .modal-actions button { padding: .5rem 1rem; border: none; border-radius: .4rem; cursor: pointer; }
+        .modal-actions .cancel { background: #334155; color: #94a3b8; }
+        .modal-actions .save { background: #0284c7; color: white; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h1>AI Agent OOP</h1>
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;font-size:.85rem;color:#94a3b8;">
+            <span>{{ user_name }}</span>
+            <a href="{% url 'logout' %}" style="color:#ef4444;text-decoration:none;margin-right:auto;">Logout</a>
+        </div>
+
+        <h2>Agents</h2>
+        <div id="agent-list">
+            {% for agent in agents %}
+            <button class="agent-btn{% if agent == active_agent %} active{% endif %}"
+                    data-agent="{{ agent }}"
+                    onclick="switchAgent('{{ agent }}')">
+                {{ agent|capfirst }}
+            </button>
+            {% endfor %}
+        </div>
+
+        <h2>Conversations</h2>
+        <div class="conv-list" id="conv-list"></div>
+
+        <button class="agent-btn" onclick="newConversation()" style="margin-top:auto;">
+            + New Conversation
+        </button>
+    </div>
+
+    <div class="modal-overlay" id="rename-modal">
+        <div class="modal-box">
+            <h3>Rename Conversation</h3>
+            <input type="text" id="rename-input" placeholder="Enter new name..."
+                   onkeydown="if(event.key==='Enter') confirmRename()">
+            <div class="modal-actions">
+                <button class="cancel" onclick="closeRename()">Cancel</button>
+                <button class="save" onclick="confirmRename()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <span>Active Agent:</span>
+            <span class="agent-label" id="active-label">{{ active_agent|capfirst }}</span>
+            <span class="tools-info" id="tools-info"></span>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="empty-state">
+                <p style="font-size:2rem;margin-bottom:.5rem;">AI Agent OOP</p>
+                <p>Send a message to start chatting</p>
+                <p style="font-size:.85rem;margin-top:.5rem;">
+                    Try: "calculator: 2 + 3 * 4" or "web_search: Python" or "code_exec: print('hi')"
+                </p>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">Thinking...</div>
+
+        <div class="input-area">
+            <textarea id="message-input" placeholder="Type your message..." autofocus
+                      onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"
+                      oninput="autoResize(this)"></textarea>
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let currentConvId = null;
+        let renameConvId = null;
+        const convData = {{ conv_list_json|safe }};
+
+        function renderConvList() {
+            const container = document.getElementById('conv-list');
+            if (!convData.length) {
+                container.innerHTML = '<span style="color:#64748b;font-size:.85rem;">No conversations yet</span>';
+                return;
+            }
+            convData.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || new Date(b.created_at) - new Date(a.created_at));
+            container.innerHTML = convData.map(c => `
+                <div class="conv-item${c.is_pinned ? ' pinned' : ''}">
+                    <span class="conv-name" onclick="loadConversation(${c.id})">${escapeHtml(c.is_pinned ? '📌 ' : '')}${escapeHtml(c.display_name)}</span>
+                    <span class="conv-actions">
+                        <button class="pin" onclick="event.stopPropagation(); togglePin(${c.id})" title="Pin">📌</button>
+                        <button onclick="event.stopPropagation(); openRename(${c.id})" title="Rename">✏️</button>
+                        <button class="del" onclick="event.stopPropagation(); deleteConv(${c.id})" title="Delete">🗑️</button>
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            addMessage('user', text);
+            input.value = '';
+            autoResize(input);
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const resp = await fetch('{% url "chat" %}', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: text, conversation_id: currentConvId}),
+                });
+                const data = await resp.json();
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('active-label').textContent =
+                    data.active_agent.charAt(0).toUpperCase() + data.active_agent.slice(1);
+                currentConvId = data.conversation_id;
+
+                document.getElementById('messages').innerHTML = '';
+                for (const msg of data.messages) {
+                    addMessage(msg.role, msg.content);
+                }
+
+                if (currentConvId && !convData.find(c => c.id === currentConvId)) {
+                    const resp2 = await fetch("{% url 'conversation_detail' 0 %}".replace("0", currentConvId), {
+                        headers: {"Accept": "application/json"},
+                    });
+                    const detail = await resp2.json();
+                    convData.unshift({
+                        id: detail.conversation_id,
+                        display_name: detail.agent_name + ' #' + detail.conversation_id,
+                        agent_name: detail.agent_name,
+                        is_pinned: false,
+                        created_at: new Date().toISOString(),
+                        msg_count: detail.messages.length,
+                    });
+                    renderConvList();
+                }
+            } catch (e) {
+                document.getElementById('loading').style.display = 'none';
+                addMessage('system', 'Error: ' + e.message);
+            }
+        }
+
+        function addMessage(role, content) {
+            const container = document.getElementById('messages');
+            const empty = container.querySelector('.empty-state');
+            if (empty) empty.remove();
+
+            const div = document.createElement('div');
+            div.className = 'msg ' + role;
+            div.innerHTML = '<span class="role-label">' + role + '</span>' +
+                '<div class="bubble">' + escapeHtml(content) + '</div>';
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+        }
+
+        async function switchAgent(name) {
+            const resp = await fetch('{% url "switch_agent" %}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({agent: name}),
+            });
+            const data = await resp.json();
+            document.getElementById('active-label').textContent =
+                name.charAt(0).toUpperCase() + name.slice(1);
+
+            document.querySelectorAll('.agent-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.agent === name);
+            });
+        }
+
+        async function loadConversation(convId) {
+            try {
+                const resp = await fetch("{% url 'conversation_detail' 0 %}".replace("0", convId), {
+                    headers: {"Accept": "application/json"},
+                });
+                const data = await resp.json();
+                currentConvId = data.conversation_id;
+
+                const agentKey = data.agent_key;
+                document.getElementById('active-label').textContent =
+                    data.agent_name;
+                document.querySelectorAll('.agent-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.agent === agentKey);
+                });
+
+                document.getElementById('messages').innerHTML = '';
+                for (const msg of data.messages) {
+                    addMessage(msg.role, msg.content);
+                }
+            } catch (e) {
+                addMessage('system', 'Error loading conversation: ' + e.message);
+            }
+        }
+
+        async function newConversation() {
+            const resp = await fetch('{% url "new_conversation" %}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({}),
+            });
+            const data = await resp.json();
+            currentConvId = null;
+            document.getElementById('messages').innerHTML = `
+                <div class="empty-state">
+                    <p style="font-size:2rem;margin-bottom:.5rem;">New Conversation</p>
+                    <p>Send a message to start</p>
+                </div>
+            `;
+        }
+
+        function openRename(convId) {
+            renameConvId = convId;
+            document.getElementById('rename-input').value = '';
+            document.getElementById('rename-modal').classList.add('show');
+            document.getElementById('rename-input').focus();
+        }
+
+        function closeRename() {
+            document.getElementById('rename-modal').classList.remove('show');
+            renameConvId = null;
+        }
+
+        async function confirmRename() {
+            const title = document.getElementById('rename-input').value.trim();
+            if (!renameConvId) return;
+            try {
+                const resp = await fetch("{% url 'rename_conversation' 0 %}".replace("0", renameConvId), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({title: title}),
+                });
+                const data = await resp.json();
+                const c = convData.find(x => x.id === renameConvId);
+                if (c) c.display_name = data.display_name;
+                renderConvList();
+                closeRename();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function deleteConv(convId) {
+            if (!confirm('Delete this conversation?')) return;
+            try {
+                await fetch("{% url 'delete_conversation' 0 %}".replace("0", convId), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                });
+                const idx = convData.findIndex(x => x.id === convId);
+                if (idx !== -1) convData.splice(idx, 1);
+                if (currentConvId === convId) newConversation();
+                renderConvList();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function togglePin(convId) {
+            try {
+                const resp = await fetch("{% url 'toggle_pin' 0 %}".replace("0", convId), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                });
+                const data = await resp.json();
+                const c = convData.find(x => x.id === convId);
+                if (c) c.is_pinned = data.is_pinned;
+                renderConvList();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        renderConvList();
+    </script>
+</body>
+</html>
