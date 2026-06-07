@@ -6,7 +6,8 @@ from .code_agent import CodeAgent
 from .data_agent import DataAgent
 from .research_agent import ResearchAgent
 from .planner_agent import PlannerAgent
-from ..tools import CalculatorTool, WebSearchTool, KeyboardConverter
+from .media_agent import MediaAgent
+from ..tools import CalculatorTool, WebSearchTool, KeyboardConverter, ImageGenTool, VideoGenTool, BlenderTool
 
 
 class AgentOrchestrator:
@@ -17,7 +18,7 @@ class AgentOrchestrator:
 
     def create_default_agents(self) -> None:
         chat = ChatAgent(name="ChatBot", llm=self.llm)
-        chat.register_tools(CalculatorTool(), WebSearchTool(), KeyboardConverter())
+        chat.register_tools(CalculatorTool(), WebSearchTool(), KeyboardConverter(), ImageGenTool(), VideoGenTool(), BlenderTool())
         self.agents["chat"] = chat
 
         code = CodeAgent(name="CodeBot", llm=self.llm)
@@ -34,6 +35,9 @@ class AgentOrchestrator:
 
         planner = PlannerAgent(name="PlannerBot", llm=self.llm, orchestrator=self)
         self.agents["planner"] = planner
+
+        media = MediaAgent(name="MediaBot", llm=self.llm)
+        self.agents["media"] = media
 
         self._active_agent = "chat"
 
@@ -64,6 +68,8 @@ class AgentOrchestrator:
             target = "data"
         elif any(kw in lower for kw in ["web_search:", "search:", "research", "summarize"]):
             target = "research"
+        elif any(kw in lower for kw in ["image_gen:", "image_edit:", "video_gen:", "video_edit:", "blender_render:", "generate image", "generate video", "make image", "make video", "create image", "create video", "3d render", "blender", "صور", "فيديو"]):
+            target = "media"
         else:
             target = "chat"
         self._active_agent = target

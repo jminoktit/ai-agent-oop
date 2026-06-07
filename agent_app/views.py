@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
 from .agents import AgentOrchestrator
-from .models import Conversation, Message
+from .models import Conversation, Message, UploadedFile
 from .tools import RuleEngine
 
 rule_engine = RuleEngine()
@@ -22,6 +22,7 @@ AGENT_NAME_TO_KEY = {
     "DataBot": "data",
     "ResearchBot": "research",
     "PlannerBot": "planner",
+    "MediaBot": "media",
 }
 
 AGENT_KEY_TO_NAME = {v: k for k, v in AGENT_NAME_TO_KEY.items()}
@@ -118,7 +119,7 @@ def chat(request):
 
     agent_key = data.get("agent")
     if not agent_key and conversation_id:
-        conv = Conversation.objects.filter(id=conversation_id).first()
+        conv = Conversation.objects.filter(id=conversation_id, user=request.user).first()
         if conv:
             agent_key = AGENT_NAME_TO_KEY.get(conv.agent_name, conv.agent_name)
 
@@ -130,8 +131,25 @@ def chat(request):
         result = orchestrator.auto_route(user_input, conversation_id)
     agent = orchestrator.get_agent(orchestrator.active_agent or "chat")
 
+    response_type = "text"
+    image_url = None
+    video_url = None
+
+    try:
+        result_data = json.loads(result)
+        if result_data.get("type") == "image":
+            response_type = "image"
+            image_url = result_data.get("url") or result_data.get("local_path")
+            result = result_data.get("content", result_data.get("error", ""))
+        elif result_data.get("type") == "video":
+            response_type = "video"
+            video_url = result_data.get("url") or result_data.get("local_path")
+            result = result_data.get("content", result_data.get("error", ""))
+    except (json.JSONDecodeError, TypeError):
+        pass
+
     if agent and agent.conversation_id:
-        conv = Conversation.objects.filter(id=agent.conversation_id).first()
+        conv = Conversation.objects.filter(id=agent.conversation_id, user=request.user).first()
         if conv and not conv.user_id:
             conv.user = request.user
             conv.save()
@@ -141,12 +159,20 @@ def chat(request):
         qs = Message.objects.filter(conversation_id=agent.conversation_id).order_by("created_at")
         messages = [{"role": m.role, "content": m.content} for m in qs]
 
-    return JsonResponse({
+    response_data = {
         "response": result,
         "active_agent": orchestrator.active_agent,
         "conversation_id": agent.conversation_id if agent else None,
         "messages": messages,
-    })
+    }
+
+    if response_type == "image" and image_url:
+        response_data["image_url"] = image_url
+
+    if response_type == "video" and video_url:
+        response_data["video_url"] = video_url
+
+    return JsonResponse(response_data)
 
 
 @login_required
@@ -180,7 +206,7 @@ def new_conversation(request):
 
 @login_required
 def conversation_detail(request, conv_id):
-    conv = get_object_or_404(Conversation, id=conv_id)
+    conv = get_object_or_404(Conversation, id=conv_id, user=request.user)
     messages = conv.messages.all().order_by("created_at")
 
     if request.headers.get("Accept") == "application/json":
@@ -250,3 +276,76 @@ def toggle_pin(request, conv_id):
     conv.is_pinned = not conv.is_pinned
     conv.save()
     return JsonResponse({"id": conv.id, "is_pinned": conv.is_pinned})
+
+
+@login_required
+def list_files(request):
+    files = UploadedFile.objects.filter(user=request.user)[:50]
+    return JsonResponse({
+        "files": [{
+            "id": f.id,
+            "filename": f.filename,
+            "file_type": f.file_type,
+            "uploaded_at": f.uploaded_at.isoformat(),
+        } for f in files]
+    })
+
+
+@login_required
+@csrf_exempt
+def upload_file(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    uploaded_file = request.FILES.get("file")
+    if not uploaded_file:
+        return JsonResponse({"error": "No file provided"}, status=400)
+
+    ext = uploaded_file.name.split(".")[-1].lower() if "." in uploaded_file.name else ""
+    file_type_map = {
+        "txt": "text", "md": "text", "py": "code", "js": "code", "html": "code", "css": "code",
+        "json": "json", "csv": "csv", "xml": "xml", "pdf": "pdf", "doc": "doc", "docx": "doc",
+    }
+    file_type = file_type_map.get(ext, "unknown")
+
+    content_text = ""
+    if file_type in ("text", "code", "json", "csv", "xml"):
+        try:
+            content_text = uploaded_file.read().decode("utf-8", errors="ignore")
+        except Exception:
+            content_text = ""
+
+    obj = UploadedFile.objects.create(
+        user=request.user,
+        file=uploaded_file,
+        filename=uploaded_file.name,
+        file_type=file_type,
+        content_text=content_text[:50000],
+    )
+    return JsonResponse({
+        "id": obj.id,
+        "filename": obj.filename,
+        "file_type": obj.file_type,
+        "uploaded_at": obj.uploaded_at.isoformat(),
+    })
+
+
+@login_required
+def get_file_content(request, file_id):
+    f = get_object_or_404(UploadedFile, id=file_id, user=request.user)
+    return JsonResponse({
+        "id": f.id,
+        "filename": f.filename,
+        "file_type": f.file_type,
+        "content": f.content_text[:10000],
+    })
+
+
+@login_required
+@csrf_exempt
+def delete_file(request, file_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    f = get_object_or_404(UploadedFile, id=file_id, user=request.user)
+    f.file.delete()
+    f.delete()
+    return JsonResponse({"deleted": True})

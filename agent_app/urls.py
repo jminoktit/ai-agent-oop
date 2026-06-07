@@ -16,4 +16,8 @@ urlpatterns = [
     path("conversation/<int:conv_id>/clear/", views.clear_conversation, name="clear_conversation"),
     path("conversation/<int:conv_id>/pin/", views.toggle_pin, name="toggle_pin"),
     path("agent-info/", views.agent_info, name="agent_info"),
+    path("files/", views.list_files, name="list_files"),
+    path("files/upload/", views.upload_file, name="upload_file"),
+    path("files/<int:file_id>/", views.get_file_content, name="get_file_content"),
+    path("files/<int:file_id>/delete/", views.delete_file, name="delete_file"),
 ]

@@ -67,3 +67,20 @@ class Rule(models.Model):
 
     def __str__(self):
         return f"[{self.rule_type}] '{self.trigger}' → '{self.action[:40]}'"
+
+
+class UploadedFile(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="uploaded_files"
+    )
+    file = models.FileField(upload_to="uploads/%Y/%m/%d/")
+    filename = models.CharField(max_length=255)
+    file_type = models.CharField(max_length=50, blank=True)
+    content_text = models.TextField(blank=True, help_text="Extracted text content")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return self.filename
