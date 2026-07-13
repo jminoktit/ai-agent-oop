@@ -28,11 +28,11 @@ if project_root not in sys.path:
 from AuraTrainer.utils.logger import setup_logger, get_logger
 from AuraTrainer.utils.gpu import auto_configure, Platform
 from AuraTrainer.utils.monitor import TrainingMonitor
-from AuraTrainer.datasets.loader import DatasetLoader
-from AuraTrainer.datasets.cleaner import DatasetCleaner
-from AuraTrainer.datasets.formatter import DatasetFormatter
-from AuraTrainer.datasets.deduplicate import DatasetDeduplicator
-from AuraTrainer.datasets.sampler import DatasetSampler
+from AuraTrainer.data.loader import DatasetLoader
+from AuraTrainer.data.cleaner import DatasetCleaner
+from AuraTrainer.data.formatter import DatasetFormatter
+from AuraTrainer.data.deduplicate import DatasetDeduplicator
+from AuraTrainer.data.sampler import DatasetSampler
 from AuraTrainer.models.loader import ModelLoader
 from AuraTrainer.models.lora import LoRAConfigurator
 from AuraTrainer.training.trainer import AuraTrainer
