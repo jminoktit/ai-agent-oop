@@ -5,6 +5,10 @@ Paste each section between # === markers as a separate Colab cell.
 Runtime → Change runtime type → T4 GPU
 """
 
+import os, sys
+os.chdir('/content')
+sys.path = [p for p in sys.path if 'AuraTrainer' not in p and 'ai-agent-op' not in p]
+
 # ╔══════════════════════════════════════════════════════════╗
 # ║  CELL 1: Install & Setup                                ║
 # ╚══════════════════════════════════════════════════════════╝

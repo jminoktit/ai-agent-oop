@@ -1,41 +1,31 @@
 #!/usr/bin/env python3
 """
-AuraBook Colab Training - SELF-CONTAINED
+AuraBook Colab Training - ROBUST SINGLE CELL
 Copy entire contents into ONE Colab cell and run.
 GPU: Runtime -> Change runtime type -> T4 GPU
 """
+import os, subprocess, sys
 
-import os, subprocess, sys, shutil
-
-# === STEP 1: Clean environment ===
+# CRITICAL: Change to /content first so local modules don't conflict
 os.chdir('/content')
-subprocess.run(['rm', '-rf', '/content/ai-agent-oop'], check=False)
-subprocess.run(['rm', '-rf', '/content/drive'], check=False)
+# Remove AuraTrainer from sys.path if it's there (causes import conflicts)
+sys.path = [p for p in sys.path if 'AuraTrainer' not in p and 'ai-agent-op' not in p]
 
-# Remove any stale datasets folder from PYTHONPATH
-for p in list(sys.path):
-    if 'ai-agent-op' in p and 'datasets' in p:
-        sys.path.remove(p)
+# === STEP 1: Clone & Clean ===
+print("Setting up environment...")
+subprocess.run(['rm', '-rf', '/content/ai-agent-oop'], check=False)
 
 print("Cloning repo...")
-subprocess.run(['git', 'clone', 'https://github.com/jminoktit/ai-agent-oop.git', '/content/ai-agent-oop'], check=True)
+result = subprocess.run(
+    ['git', 'clone', 'https://github.com/jminoktit/ai-agent-oop.git', '/content/ai-agent-oop'],
+    capture_output=True, text=True
+)
+if result.returncode != 0:
+    print(f"Clone failed: {result.stderr}")
+else:
+    print("Repo cloned!")
 
-# FORCE remove old datasets folder if it exists
-old_ds = '/content/ai-agent-oop/AuraTrainer/datasets'
-if os.path.exists(old_ds):
-    print("Removing old datasets/ folder...")
-    shutil.rmtree(old_ds, ignore_errors=True)
-
-# Remove __pycache__ that may cache old imports
-for root, dirs, files in os.walk('/content/ai-agent-oop/AuraTrainer'):
-    for d in dirs:
-        if d == '__pycache__':
-            shutil.rmtree(os.path.join(root, d), ignore_errors=True)
-
-# Remove ALL .pyc files
-subprocess.run(['find', '/content/ai-agent-oop', '-name', '*.pyc', '-delete'], check=False)
-subprocess.run(['find', '/content/ai-agent-oop', '-name', '__pycache__', '-type', 'd', '-exec', 'rm', '-rf', '{}', '+'], check=False)
-
+# Install packages
 print("Installing packages...")
 pkgs = [
     "torch>=2.1.0", "transformers>=4.36.0", "datasets>=2.16.0",
@@ -44,8 +34,9 @@ pkgs = [
 ]
 for p in pkgs:
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", p], check=False)
-print("All packages installed!")
+print("Packages installed!")
 
+# Mount Google Drive
 from google.colab import drive
 drive.mount("/content/drive")
 os.makedirs("/content/drive/MyDrive/AuraBook/checkpoints", exist_ok=True)
@@ -181,7 +172,7 @@ def fmt_example(raw, fields):
     if not user or len(user) < 5: return None
     return format_chat(user, main)
 
-def load_batch(target, rnd=0):
+def load_batch(target):
     examples = []
     for cat, cfg in DATASETS.items():
         cat_target = int(target * cfg["ratio"])
@@ -274,7 +265,7 @@ for rnd in range(1, NUM_ROUNDS + 1):
     print(f"{'='*60}")
 
     print("Loading data batch...")
-    batch_examples = load_batch(BATCH, rnd)
+    batch_examples = load_batch(BATCH)
     print(f"  Loaded: {len(batch_examples):,} examples")
 
     if len(batch_examples) < 100:

@@ -13,7 +13,11 @@ Usage in Colab:
 # ║  CELL 1: Install & Setup                                ║
 # ╚══════════════════════════════════════════════════════════╝
 
-import subprocess, sys
+import subprocess, sys, os
+
+# CRITICAL: Change to /content to avoid local module import conflicts
+os.chdir('/content')
+sys.path = [p for p in sys.path if 'AuraTrainer' not in p and 'ai-agent-op' not in p]
 
 def install():
     pkgs = [
