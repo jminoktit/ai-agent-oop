@@ -73,7 +73,7 @@ CONFIG = {
     "TOTAL_SAMPLES": 100000,
     "BATCH_SIZE": 10000,
     "EVAL_SPLIT": 0.05,
-    "MODEL_NAME": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "MODEL_NAME": "google/gemma-2-2b-it",
     "LORA_R": 64, "LORA_ALPHA": 128, "LORA_DROPOUT": 0.05,
     "EPOCHS_PER_ROUND": 2,
     "LEARNING_RATE": 2e-4,
@@ -84,6 +84,15 @@ CONFIG = {
     "CHECKPOINT_DIR": CKPT_DIR,
     "OUTPUT_DIR": OUT_DIR,
 }
+
+# HuggingFace Token (required for Gemma)
+HF_TOKEN = os.environ.get("HF_TOKEN", None)
+if HF_TOKEN:
+    from huggingface_hub import login
+    login(token=HF_TOKEN)
+    print("Logged in to HuggingFace!")
+else:
+    print("No HF_TOKEN set - using public models only")
 
 print(f"GPU: {gpu_name} ({vram_gb:.1f} GB)")
 print(f"Batch: {BS}, GradAccum: {GA}, Effective: {BS*GA}")
@@ -220,8 +229,9 @@ bnb = BitsAndBytesConfig(
 
 model = AutoModelForCausalLM.from_pretrained(
     CONFIG["MODEL_NAME"], quantization_config=bnb, device_map="auto",
+    token=HF_TOKEN,
 )
-tokenizer = AutoTokenizer.from_pretrained(CONFIG["MODEL_NAME"])
+tokenizer = AutoTokenizer.from_pretrained(CONFIG["MODEL_NAME"], token=HF_TOKEN)
 tokenizer.pad_token = tokenizer.eos_token
 
 model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
@@ -380,6 +390,7 @@ from peft import PeftModel
 print("Merging LoRA weights...")
 base_model = AutoModelForCausalLM.from_pretrained(
     CONFIG["MODEL_NAME"], torch_dtype=torch.float16, device_map="auto",
+    token=HF_TOKEN,
 )
 last_ckpt = f"{CONFIG['CHECKPOINT_DIR']}/checkpoint-{NUM_ROUNDS}"
 merged_model = PeftModel.from_pretrained(base_model, last_ckpt)
