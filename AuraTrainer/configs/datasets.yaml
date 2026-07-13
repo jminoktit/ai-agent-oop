@@ -1,0 +1,278 @@
+# AuraTrainer Dataset Configuration
+# Dataset sources and balancing ratios
+
+# ─── Dataset Categories ─────────────────────────────────
+categories:
+  programming:
+    ratio: 0.40
+    streaming: true
+    datasets:
+      - name: "codealpaca"
+        source: "HuggingFace"
+        repo: "tatsu-lab/alpaca"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          instruction: "instruction"
+          input: "input"
+          output: "output"
+
+      - name: "evol_codealpaca"
+        source: "HuggingFace"
+        repo: "HuggingFaceTB/evol-codealpaca"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          instruction: "instruction"
+          input: "input"
+          output: "output"
+
+      - name: "mbpp"
+        source: "HuggingFace"
+        repo: "google-research-datasets/mbpp"
+        subset: "full"
+        split: "train"
+        stream: true
+        fields:
+          question: "problem"
+          answer: "solution"
+          test: "test"
+
+      - name: "humaneval"
+        source: "HuggingFace"
+        repo: "openai_humaneval"
+        subset: null
+        split: "test"
+        stream: false
+        fields:
+          question: "prompt"
+          answer: "canonical_solution"
+
+      - name: "apps"
+        source: "HuggingFace"
+        repo: "codeparrot/apps"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          question: "problem"
+          answer: "solutions"
+          difficulty: "difficulty"
+
+      - name: "codesearchnet"
+        source: "HuggingFace"
+        repo: "code_search_net"
+        subset: "python"
+        split: "train"
+        stream: true
+        fields:
+          question: "func_documentation_string"
+          answer: "func_code_string"
+          repo_name: "repository_name"
+
+      - name: "the_stack_python"
+        source: "HuggingFace"
+        repo: "bigcode/thestack"
+        subset: "Data/python"
+        split: "train"
+        stream: true
+        fields:
+          code: "content"
+          lang: "lang"
+
+  chat:
+    ratio: 0.25
+    streaming: true
+    datasets:
+      - name: "openhermes"
+        source: "HuggingFace"
+        repo: "Open-Orca/OpenOrca-Platypus2"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          instruction: "instruction"
+          input: "input"
+          output: "output"
+
+      - name: "ultrachat"
+        source: "HuggingFace"
+        repo: "stingning/ultrachat"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          prompt: "prompt"
+          response: "response"
+
+      - name: "oasst2"
+        source: "HuggingFace"
+        repo: "OpenAssistant/oasst2"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          text: "text"
+          role: "role"
+          lang: "lang"
+
+      - name: "sharegpt"
+        source: "HuggingFace"
+        repo: "anon8231489123/ShareGPT_Vicuna_unfiltered"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          conversations: "conversations"
+
+      - name: "openorca"
+        source: "HuggingFace"
+        repo: "Open-Orca/OpenOrca"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          instruction: "instruction"
+          input: "input"
+          output: "output"
+
+  math:
+    ratio: 0.15
+    streaming: true
+    datasets:
+      - name: "metamathqa"
+        source: "HuggingFace"
+        repo: "meta-math/MetaMathQA"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          question: "query"
+          answer: "response"
+
+      - name: "gsm8k"
+        source: "HuggingFace"
+        repo: "openai/gsm8k"
+        subset: "main"
+        split: "train"
+        stream: true
+        fields:
+          question: "question"
+          answer: "answer"
+
+      - name: "openmathinstruct"
+        source: "HuggingFace"
+        repo: "NousResearch/OpenMathInstruct-1"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          question: "problem"
+          answer: "solution"
+
+  education:
+    ratio: 0.10
+    streaming: true
+    datasets:
+      - name: "natural_instructions"
+        source: "HuggingFace"
+        repo: "Muennighoff/natural-instructions"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          input: "input"
+          output: "output"
+
+      - name: "flan"
+        source: "HuggingFace"
+        repo: "openwebtext"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          text: "text"
+
+      - name: "wikihow"
+        source: "HuggingFace"
+        repo: "wikihow"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          title: "title"
+          article: "article"
+          section: "section"
+
+  arabic:
+    ratio: 0.10
+    streaming: true
+    datasets:
+      - name: "arabic_openhermes"
+        source: "HuggingFace"
+        repo: "MBZUAI-AILab/arabic-openhermes"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          instruction: "instruction"
+          input: "input"
+          output: "output"
+
+      - name: "arabic_alpaca"
+        source: "HuggingFace"
+        repo: "Arabic-Alpaca"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          instruction: "instruction"
+          input: "input"
+          output: "output"
+
+      - name: "code_alpaca_arabic"
+        source: "HuggingFace"
+        repo: "CAMEL-AI/code-alpaca-arabic"
+        subset: null
+        split: "train"
+        stream: true
+        fields:
+          instruction: "instruction"
+          input: "input"
+          output: "output"
+
+      - name: "aya_arabic"
+        source: "HuggingFace"
+        repo: "CohereForMaya/aya_collection"
+        subset: "ar"
+        split: "train"
+        stream: true
+        fields:
+          input: "input"
+          output: "output"
+
+# ─── Cleaning Rules ─────────────────────────────────────
+cleaning:
+  min_text_length: 10
+  max_text_length: 8192
+  remove_duplicates: true
+  remove_empty: true
+  remove_broken_code: true
+  dedup_method: "exact"
+  min_words: 3
+  max_words: 4096
+
+# ─── Balance Config ─────────────────────────────────────
+balance:
+  strategy: "ratio"
+  shuffle: true
+  seed: 42
+  target_sizes:
+    - "50k"
+    - "100k"
+    - "250k"
+    - "500k"
+    - "1M"
+    - "2M"

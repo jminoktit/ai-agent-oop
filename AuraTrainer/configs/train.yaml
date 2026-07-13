@@ -1,0 +1,100 @@
+# AuraTrainer Training Configuration
+# TinyLlama-1.1B-Chat QLoRA Fine-tuning
+
+# ─── Model ───────────────────────────────────────────────
+model:
+  name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+  max_length: 2048
+  torch_dtype: "auto"
+  trust_remote_code: true
+
+# ─── QLoRA ──────────────────────────────────────────────
+qlora:
+  enabled: true
+  bits: 4
+  quant_type: "nf4"
+  compute_dtype: "bfloat16"
+  double_quant: true
+  lora_r: 64
+  lora_alpha: 128
+  lora_dropout: 0.05
+  lora_target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  lora_bias: "none"
+  lora_task_type: "CAUSAL_LM"
+
+# ─── Training ───────────────────────────────────────────
+training:
+  output_dir: "./outputs"
+  num_train_epochs: 3
+  max_steps: -1
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.03
+  warmup_steps: 100
+  weight_decay: 0.01
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-8
+  max_grad_norm: 1.0
+  fp16: false
+  bf16: true
+  tf32: true
+  gradient_checkpointing: true
+  optim: "paged_adamw_8bit"
+  logging_steps: 10
+  save_steps: 200
+  save_total_limit: 3
+  eval_strategy: "steps"
+  eval_steps: 200
+  dataloader_num_workers: 4
+  remove_unused_columns: false
+  report_to: "none"
+  run_name: "aura-book-qlora"
+  seed: 42
+  ddp_timeout: 1800
+
+# ─── Flash Attention ────────────────────────────────────
+flash_attention:
+  enabled: true
+  backend: "sdpa"
+
+# ─── Checkpoint ─────────────────────────────────────────
+checkpoint:
+  resume_from_checkpoint: true
+  checkpoint_dir: "./checkpoints"
+  save_optimizer: true
+
+# ─── Google Drive (Colab) ──────────────────────────────
+gdrive:
+  enabled: false
+  mount_point: "/content/drive"
+  save_dir: "AuraBook/checkpoints"
+
+# ─── Dataset Sizes ──────────────────────────────────────
+dataset_sizes:
+  - "50k"
+  - "100k"
+  - "250k"
+  - "500k"
+  - "1M"
+  - "2M"
+
+default_dataset_size: "100k"
+
+# ─── Monitoring ─────────────────────────────────────────
+monitoring:
+  log_gpu: true
+  log_vram: true
+  log_samples_per_sec: true
+  log_tokens_per_sec: true
+  log_eta: true
+  interval_steps: 10
