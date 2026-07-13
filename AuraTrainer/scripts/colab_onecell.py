@@ -136,7 +136,7 @@ DATASETS = {
         "sources": [
             ("tatsu-lab/alpaca", None, "train",
              {"instruction": "instruction", "input": "input", "output": "output"}),
-            ("BAAI/CodeSearchNet", "python", "train",
+            ("code-search-net/code_search_net", "python", "train",
              {"func_documentation_string": "question", "func_code_string": "answer"}),
         ],
     },
