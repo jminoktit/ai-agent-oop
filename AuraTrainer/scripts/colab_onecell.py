@@ -36,12 +36,15 @@ for p in pkgs:
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", p], check=False)
 print("Packages installed!")
 
-# Mount Google Drive
-from google.colab import drive
-drive.mount("/content/drive")
-os.makedirs("/content/drive/MyDrive/AuraBook/checkpoints", exist_ok=True)
-os.makedirs("/content/drive/MyDrive/AuraBook/outputs", exist_ok=True)
-print("Google Drive mounted!")
+# Mount Google Drive (optional - works in Colab notebook)
+try:
+    from google.colab import drive
+    drive.mount("/content/drive")
+    GDRIVE = True
+    print("Google Drive mounted!")
+except Exception:
+    GDRIVE = False
+    print("Google Drive not available, using local storage")
 
 # === STEP 2: Imports & Config ===
 import torch, gc, json, time, hashlib, random, re, glob
@@ -61,6 +64,17 @@ elif vram_gb <= 40:
 else:
     BS, GA, BS_MAX = 16, 1, 4096
 
+# Set paths based on Drive availability
+if GDRIVE:
+    CKPT_DIR = "/content/drive/MyDrive/AuraBook/checkpoints"
+    OUT_DIR = "/content/drive/MyDrive/AuraBook/outputs"
+else:
+    CKPT_DIR = "/content/ai-agent-oop/AuraTrainer/outputs/checkpoints"
+    OUT_DIR = "/content/ai-agent-oop/AuraTrainer/outputs"
+
+os.makedirs(CKPT_DIR, exist_ok=True)
+os.makedirs(OUT_DIR, exist_ok=True)
+
 CONFIG = {
     "TOTAL_SAMPLES": 100000,
     "BATCH_SIZE": 10000,
@@ -73,8 +87,8 @@ CONFIG = {
     "MAX_SEQ_LENGTH": min(2048, BS_MAX),
     "SAVE_EVERY_N_STEPS": 100,
     "BATCH_SIZE_GPU": BS, "GRAD_ACCUM": GA,
-    "CHECKPOINT_DIR": "/content/drive/MyDrive/AuraBook/checkpoints",
-    "OUTPUT_DIR": "/content/drive/MyDrive/AuraBook/outputs",
+    "CHECKPOINT_DIR": CKPT_DIR,
+    "OUTPUT_DIR": OUT_DIR,
 }
 
 print(f"GPU: {gpu_name} ({vram_gb:.1f} GB)")
