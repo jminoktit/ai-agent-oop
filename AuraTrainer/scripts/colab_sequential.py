@@ -178,7 +178,7 @@ DATASETS = {
     "arabic": {
         "ratio": 0.10,
         "sources": [
-            ("OALL/Arabic-Alpaca-20K", None, "train",
+            ("arbml/alpaca_arabic", None, "train",
              {"instruction": "instruction", "input": "input", "output": "output"}),
         ],
     },

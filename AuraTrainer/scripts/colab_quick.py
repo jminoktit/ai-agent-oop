@@ -122,7 +122,7 @@ for repo, sub, flds in [
 
 # Arabic 10%
 for repo, sub, flds in [
-    ("MBZUAI-AILab/arabic-openhermes", None, ("instruction","input","output")),
+    ("arbml/alpaca_arabic", None, ("instruction","input","output")),
 ]:
     ds = load_dataset(repo, sub, split="train", streaming=True)
     n = 0

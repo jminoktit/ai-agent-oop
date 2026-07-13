@@ -223,7 +223,7 @@ categories:
 
       - name: "arabic_alpaca"
         source: "HuggingFace"
-        repo: "Arabic-Alpaca"
+        repo: "arbml/alpaca_arabic"
         subset: null
         split: "train"
         stream: true

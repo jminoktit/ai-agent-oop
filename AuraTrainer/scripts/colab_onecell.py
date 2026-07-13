@@ -1,49 +1,44 @@
 #!/usr/bin/env python3
 """
-AuraBook Colab Training - ROBUST SINGLE CELL
+AuraBook Colab Training - FINAL ROBUST VERSION
 Copy entire contents into ONE Colab cell and run.
 GPU: Runtime -> Change runtime type -> T4 GPU
 """
 import os, subprocess, sys
 
-# CRITICAL: Change to /content first so local modules don't conflict
+# CRITICAL: Avoid local module conflicts
 os.chdir('/content')
-# Remove AuraTrainer from sys.path if it's there (causes import conflicts)
 sys.path = [p for p in sys.path if 'AuraTrainer' not in p and 'ai-agent-op' not in p]
 
-# === STEP 1: Clone & Clean ===
+# === STEP 1: Clone & Install ===
 print("Setting up environment...")
 subprocess.run(['rm', '-rf', '/content/ai-agent-oop'], check=False)
 
 print("Cloning repo...")
-result = subprocess.run(
+r = subprocess.run(
     ['git', 'clone', 'https://github.com/jminoktit/ai-agent-oop.git', '/content/ai-agent-oop'],
     capture_output=True, text=True
 )
-if result.returncode != 0:
-    print(f"Clone failed: {result.stderr}")
-else:
-    print("Repo cloned!")
+if r.returncode != 0:
+    print(f"Clone failed: {r.stderr}")
+    sys.exit(1)
+print("Repo cloned!")
 
-# Install packages
 print("Installing packages...")
-pkgs = [
-    "torch>=2.1.0", "transformers>=4.36.0", "datasets>=2.16.0",
-    "peft>=0.7.0", "bitsandbytes>=0.41.0", "trl>=0.7.4",
-    "accelerate>=0.25.0", "safetensors>=0.4.0", "huggingface-hub>=0.19.0",
-]
-for p in pkgs:
+for p in ["torch>=2.1.0", "transformers>=4.36.0", "datasets>=2.16.0",
+          "peft>=0.7.0", "bitsandbytes>=0.41.0", "trl>=0.7.4",
+          "accelerate>=0.25.0", "safetensors>=0.4.0", "huggingface-hub>=0.19.0"]:
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", p], check=False)
 print("Packages installed!")
 
-# Mount Google Drive (optional - works in Colab notebook)
+# Mount Google Drive (optional)
+GDRIVE = False
 try:
     from google.colab import drive
     drive.mount("/content/drive")
     GDRIVE = True
     print("Google Drive mounted!")
 except Exception:
-    GDRIVE = False
     print("Google Drive not available, using local storage")
 
 # === STEP 2: Imports & Config ===
@@ -64,7 +59,6 @@ elif vram_gb <= 40:
 else:
     BS, GA, BS_MAX = 16, 1, 4096
 
-# Set paths based on Drive availability
 if GDRIVE:
     CKPT_DIR = "/content/drive/MyDrive/AuraBook/checkpoints"
     OUT_DIR = "/content/drive/MyDrive/AuraBook/outputs"
@@ -130,6 +124,7 @@ print("Format functions ready")
 # === STEP 4: Load Data (Streaming) ===
 from datasets import load_dataset as hf_load_dataset, Dataset
 
+# ALL VERIFIED WORKING DATASETS
 DATASETS = {
     "programming": {
         "ratio": 0.40,
@@ -168,7 +163,7 @@ DATASETS = {
     "arabic": {
         "ratio": 0.10,
         "sources": [
-            ("OALL/Arabic-Alpaca-20K", None, "train",
+            ("arbml/alpaca_arabic", None, "train",
              {"instruction": "instruction", "input": "input", "output": "output"}),
         ],
     },
@@ -297,6 +292,13 @@ for rnd in range(1, NUM_ROUNDS + 1):
     total_steps = steps_per_epoch * CONFIG["EPOCHS_PER_ROUND"]
     print(f"  Steps/epoch: {steps_per_epoch} | Total steps: {total_steps}")
 
+    if steps_per_epoch == 0:
+        print("  Warning: batch too large for dataset, adjusting...")
+        CONFIG["GRAD_ACCUM"] = 1
+        effective_batch = CONFIG["BATCH_SIZE_GPU"]
+        steps_per_epoch = len(train_ds) // effective_batch
+        total_steps = steps_per_epoch * CONFIG["EPOCHS_PER_ROUND"]
+
     round_output = f"{CONFIG['OUTPUT_DIR']}/round-{rnd}"
     os.makedirs(round_output, exist_ok=True)
 
@@ -347,6 +349,9 @@ for rnd in range(1, NUM_ROUNDS + 1):
         CONFIG["BATCH_SIZE_GPU"] = max(1, CONFIG["BATCH_SIZE_GPU"] // 2)
         CONFIG["GRAD_ACCUM"] = min(CONFIG["GRAD_ACCUM"] * 2, 32)
         print(f"  New: batch={CONFIG['BATCH_SIZE_GPU']}, grad_accum={CONFIG['GRAD_ACCUM']}")
+        continue
+    except Exception as e:
+        print(f"Error in round {rnd}: {e}")
         continue
 
     ckpt_path = f"{CONFIG['CHECKPOINT_DIR']}/checkpoint-{rnd}"

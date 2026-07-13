@@ -208,7 +208,7 @@ def load_all_datasets():
         "arabic": {
             "ratio": 0.10,
             "datasets": [
-                ("MBZUAI-AILab/arabic-openhermes", None, "train",
+                ("arbml/alpaca_arabic", None, "train",
                  {"instruction": "instruction", "input": "input", "output": "output"}),
                 ("CohereForMaya/aya_collection", "ar", "train",
                  {"input": "input", "output": "output"}),
