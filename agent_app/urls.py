@@ -20,4 +20,9 @@ urlpatterns = [
     path("files/upload/", views.upload_file, name="upload_file"),
     path("files/<int:file_id>/", views.get_file_content, name="get_file_content"),
     path("files/<int:file_id>/delete/", views.delete_file, name="delete_file"),
+    # ── Training ──
+    path("training/", views.training_dashboard, name="training_dashboard"),
+    path("training/start/", views.start_training, name="start_training"),
+    path("training/<int:job_id>/status/", views.training_status, name="training_status"),
+    path("training/<int:job_id>/stop/", views.stop_training, name="stop_training"),
 ]

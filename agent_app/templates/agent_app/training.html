@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Dashboard - AI Agent OOP</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .nav { background: #1e293b; border-bottom: 1px solid #334155; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+        .nav h1 { font-size: 1.2rem; color: #38bdf8; }
+        .nav a { color: #94a3b8; text-decoration: none; padding: .4rem .8rem; border-radius: .4rem; transition: .2s; }
+        .nav a:hover { background: #334155; color: #e2e8f0; }
+        .nav a.active { background: #0284c7; color: white; }
+        .container { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: .8rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card h2 { color: #38bdf8; margin-bottom: 1rem; font-size: 1.1rem; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-group { display: flex; flex-direction: column; gap: .4rem; }
+        .form-group.full { grid-column: 1 / -1; }
+        .form-group label { font-size: .85rem; color: #94a3b8; }
+        .form-group select, .form-group input, .form-group textarea {
+            padding: .6rem .8rem; border: 1px solid #334155; border-radius: .4rem;
+            background: #0f172a; color: #e2e8f0; font-size: .9rem; font-family: inherit;
+        }
+        .form-group select:focus, .form-group input:focus, .form-group textarea:focus {
+            outline: none; border-color: #38bdf8;
+        }
+        .form-group .hint { font-size: .75rem; color: #64748b; }
+
+        .btn { padding: .7rem 1.5rem; border: none; border-radius: .5rem; cursor: pointer; font-size: .9rem; font-weight: 600; transition: .2s; }
+        .btn-primary { background: #0284c7; color: white; }
+        .btn-primary:hover { background: #0369a1; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-sm { padding: .4rem .8rem; font-size: .8rem; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        .jobs-list { display: flex; flex-direction: column; gap: .8rem; }
+        .job-card { background: #0f172a; border: 1px solid #334155; border-radius: .6rem; padding: 1rem; }
+        .job-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .8rem; }
+        .job-header .model { color: #38bdf8; font-weight: 600; }
+        .badge { padding: .2rem .6rem; border-radius: 1rem; font-size: .75rem; font-weight: 600; }
+        .badge-pending { background: #334155; color: #94a3b8; }
+        .badge-running { background: #0369a1; color: #7dd3fc; animation: pulse 1.5s infinite; }
+        .badge-completed { background: #166534; color: #86efac; }
+        .badge-failed { background: #991b1b; color: #fca5a5; }
+
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
+
+        .progress-bar { width: 100%; height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin: .5rem 0; }
+        .progress-fill { height: 100%; background: #0284c7; border-radius: 4px; transition: width .3s ease; }
+        .progress-fill.completed { background: #22c55e; }
+        .progress-fill.failed { background: #dc2626; }
+
+        .job-meta { display: flex; gap: 1.5rem; font-size: .8rem; color: #64748b; flex-wrap: wrap; }
+        .job-meta span { display: flex; align-items: center; gap: .3rem; }
+
+        .empty-state { text-align: center; padding: 3rem; color: #64748b; }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+        .toast { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); background: #0284c7; color: white; padding: .8rem 1.5rem; border-radius: .5rem; z-index: 1000; display: none; font-size: .9rem; }
+        .toast.error { background: #dc2626; }
+        .toast.show { display: block; animation: fadeInOut 3s ease forwards; }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(-50%) translateY(-10px); } 10% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+        .checkbox-group { display: flex; align-items: center; gap: .5rem; }
+        .checkbox-group input[type="checkbox"] { width: auto; accent-color: #0284c7; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <h1>AI Agent OOP</h1>
+        <a href="{% url 'index' %}">Chat</a>
+        <a href="{% url 'training_dashboard' %}" class="active">Training</a>
+        <a href="{% url 'logout' %}" style="margin-right: auto; color: #ef4444;">Logout</a>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Start New Training</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Model</label>
+                    <select id="model">
+                        <option value="google/gemma-2-2b-it" selected>Gemma 2B (Recommended)</option>
+                        <option value="TinyLlama/TinyLlama-1.1B-Chat-v1.0">TinyLlama 1.1B</option>
+                        <option value="Qwen/Qwen2-1.5B">Qwen2 1.5B</option>
+                        <option value="microsoft/phi-2">Phi-2 2.7B</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Dataset Size</label>
+                    <select id="dataset_size">
+                        <option value="10k">10K samples (~5 min)</option>
+                        <option value="50k">50K samples (~25 min)</option>
+                        <option value="100k" selected>100K samples (~50 min)</option>
+                        <option value="200k">200K samples (~100 min)</option>
+                        <option value="500k">500K samples (~4 hours)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Batch Size (samples per round)</label>
+                    <select id="batch_size">
+                        <option value="5000">5,000</option>
+                        <option value="10000" selected>10,000</option>
+                        <option value="20000">20,000</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Email (for notification)</label>
+                    <input type="email" id="email" placeholder="your@email.com">
+                    <span class="hint">Get notified when training completes</span>
+                </div>
+                <div class="form-group full">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="notify" checked>
+                        <label for="notify">Send email notification when done</label>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; display: flex; gap: .5rem;">
+                <button class="btn btn-primary" id="startBtn" onclick="startTraining()">Start Training</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Training Jobs</h2>
+            <div id="jobs-list" class="jobs-list">
+                {% if jobs %}
+                    {% for job in jobs %}
+                    <div class="job-card" id="job-{{ job.id }}">
+                        <div class="job-header">
+                            <span class="model">{{ job.model_name }}</span>
+                            <span class="badge badge-{{ job.status }}">{{ job.get_status_display }}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill {{ job.status }}" style="width: {{ job.progress_percent }}%"></div>
+                        </div>
+                        <div class="job-meta">
+                            <span>Round {{ job.current_round }}/{{ job.total_rounds }}</span>
+                            {% if job.current_loss %}<span>Loss: {{ job.current_loss|floatformat:4 }}</span>{% endif %}
+                            <span>{{ job.dataset_size }} samples</span>
+                            {% if job.email %}<span>Email: {{ job.email }}</span>{% endif %}
+                            <span>{{ job.created_at|date:"M d, H:i" }}</span>
+                        </div>
+                        {% if job.error_message %}
+                        <pre style="margin-top:.5rem;font-size:.75rem;color:#fca5a5;max-height:100px;overflow:auto;">{{ job.error_message }}</pre>
+                        {% endif %}
+                        {% if job.status == "running" %}
+                        <div style="margin-top:.8rem;">
+                            <button class="btn btn-danger btn-sm" onclick="stopTraining({{ job.id }})">Stop</button>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <div class="icon">🤖</div>
+                        <p>No training jobs yet. Start your first one above!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast show' + (isError ? ' error' : '');
+            setTimeout(() => t.className = 'toast', 3000);
+        }
+
+        async function startTraining() {
+            const btn = document.getElementById('startBtn');
+            btn.disabled = true;
+            btn.textContent = 'Starting...';
+
+            try {
+                const res = await fetch('/training/start/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    },
+                    body: JSON.stringify({
+                        model_name: document.getElementById('model').value,
+                        dataset_size: document.getElementById('dataset_size').value,
+                        batch_size: parseInt(document.getElementById('batch_size').value),
+                        email: document.getElementById('email').value,
+                        notify_on_complete: document.getElementById('notify').checked,
+                    }),
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('Training started!');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast(data.error || 'Failed to start', true);
+                }
+            } catch (e) {
+                showToast('Network error', true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Start Training';
+            }
+        }
+
+        async function stopTraining(jobId) {
+            if (!confirm('Stop this training job?')) return;
+            try {
+                const res = await fetch(`/training/${jobId}/stop/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                });
+                if (res.ok) {
+                    showToast('Training stopped');
+                    setTimeout(() => location.reload(), 500);
+                }
+            } catch (e) {
+                showToast('Failed to stop', true);
+            }
+        }
+
+        // Auto-refresh running jobs
+        setInterval(async () => {
+            const cards = document.querySelectorAll('.job-card');
+            cards.forEach(async card => {
+                const id = card.id.replace('job-', '');
+                const badge = card.querySelector('.badge');
+                if (badge && badge.classList.contains('badge-running')) {
+                    try {
+                        const res = await fetch(`/training/${id}/status/`);
+                        const data = await res.json();
+                        const fill = card.querySelector('.progress-fill');
+                        if (fill) fill.style.width = data.progress + '%';
+                        const meta = card.querySelector('.job-meta');
+                        if (meta) {
+                            const spans = meta.querySelectorAll('span');
+                            if (spans[0]) spans[0].textContent = `Round ${data.current_round}/${data.total_rounds}`;
+                            if (spans[1] && data.current_loss) spans[1].textContent = `Loss: ${data.current_loss.toFixed(4)}`;
+                        }
+                        if (data.status !== 'running') location.reload();
+                    } catch (e) {}
+                }
+            });
+        }, 5000);
+    </script>
+</body>
+</html>

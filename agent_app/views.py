@@ -349,3 +349,228 @@ def delete_file(request, file_id):
     f.file.delete()
     f.delete()
     return JsonResponse({"deleted": True})
+
+
+# ──────────────── TRAINING ────────────────
+
+import threading
+import traceback
+from django.utils import timezone
+
+
+def _run_training_job(job_id):
+    """Background thread that runs the actual training."""
+    from .models import TrainingJob
+    import importlib, sys, os
+
+    job = TrainingJob.objects.get(id=job_id)
+    job.status = "running"
+    job.started_at = timezone.now()
+    job.save()
+
+    try:
+        trainer_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "AuraTrainer")
+        if trainer_dir not in sys.path:
+            sys.path.insert(0, os.path.dirname(trainer_dir))
+
+        # Re-import inside thread to avoid Django module conflicts
+        from AuraTrainer.utils.gpu import GPUManager
+        from AuraTrainer.models.loader import ModelLoader
+        from AuraTrainer.models.lora import LoRAConfig
+        from AuraTrainer.data.loader import DatasetLoader
+        from AuraTrainer.data.formatter import DataFormatter
+        from AuraTrainer.data.sampler import DataSampler
+        from AuraTrainer.training.trainer import AuraTrainer
+        from AuraTrainer.training.callbacks import PerformanceCallback, MemoryCallback
+        from AuraTrainer.utils.logger import AuraLogger
+        import yaml
+
+        gpu = GPUManager()
+        gpu_info = gpu.detect()
+        config = gpu.auto_configure(gpu_info)
+
+        logger = AuraLogger("AuraTrainerBackend")
+        logger.info(f"GPU: {gpu_info['name']}, Memory: {gpu_info['total_memory']}GB")
+
+        model_loader = ModelLoader()
+        model, tokenizer = model_loader.load(
+            model_name=job.model_name,
+            gpu_info=gpu_info,
+            config=config,
+        )
+
+        lora = LoRAConfig()
+        model = lora.apply(model)
+
+        loader = DatasetLoader()
+        formatter = DataFormatter()
+        sampler = DataSampler()
+
+        total_rounds = max(1, job.total_samples // job.batch_size)
+        job.total_rounds = total_rounds
+        job.save()
+
+        all_metrics = []
+        for round_idx in range(total_rounds):
+            round_start = round_idx * job.batch_size
+            round_end = round_start + job.batch_size
+
+            dataset = loader.load_dataset(round_start, round_end)
+            dataset = formatter.format(dataset)
+
+            trainer_obj = AuraTrainer(
+                model=model,
+                tokenizer=tokenizer,
+                dataset=dataset,
+                config=config,
+                gpu_info=gpu_info,
+            )
+            trainer_obj.setup()
+            result = trainer_obj.train()
+
+            job.current_round = round_idx + 1
+            job.current_loss = result.get("loss", 0)
+            all_metrics.append(result)
+            job.save()
+            logger.info(f"Round {job.current_round}/{total_rounds} done, loss={job.current_loss}")
+
+        # Save final model
+        save_dir = os.path.join(trainer_dir, "checkpoints", f"job_{job_id}")
+        os.makedirs(save_dir, exist_ok=True)
+        model.save_pretrained(save_dir)
+        tokenizer.save_pretrained(save_dir)
+
+        job.status = "completed"
+        job.completed_at = timezone.now()
+        job.save()
+        logger.info(f"Training job {job_id} completed successfully!")
+
+        # Send email
+        if job.notify_on_complete and job.email:
+            _send_email(
+                to_email=job.email,
+                subject=f"✅ Training Completed - {job.model_name}",
+                body=(
+                    f"Training completed successfully!\n\n"
+                    f"Model: {job.model_name}\n"
+                    f"Total rounds: {total_rounds}\n"
+                    f"Final loss: {all_metrics[-1].get('loss', 'N/A') if all_metrics else 'N/A'}\n"
+                    f"Checkpoint saved to: {save_dir}\n"
+                ),
+            )
+
+    except Exception as e:
+        job.status = "failed"
+        job.error_message = traceback.format_exc()
+        job.save()
+        if job.notify_on_complete and job.email:
+            _send_email(
+                to_email=job.email,
+                subject=f"❌ Training Failed - {job.model_name}",
+                body=f"Training failed with error:\n\n{traceback.format_exc()}\n",
+            )
+
+
+def _send_email(to_email, subject, body):
+    """Send email via SMTP (Gmail App Password)."""
+    import smtplib, os
+    from email.mime.text import MIMEText
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+
+    if not smtp_user or not smtp_pass:
+        return
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = smtp_user
+    msg["To"] = to_email
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as s:
+            s.starttls()
+            s.login(smtp_user, smtp_pass)
+            s.send_message(msg)
+    except Exception:
+        pass
+
+
+@login_required
+def training_dashboard(request):
+    """Training dashboard page."""
+    jobs = TrainingJob.objects.filter(user=request.user)[:20]
+    return render(request, "agent_app/training.html", {
+        "jobs": jobs,
+        "user_name": request.user.username,
+    })
+
+
+@login_required
+@csrf_exempt
+def start_training(request):
+    """Start a new training job (async in background thread)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    data = json.loads(request.body)
+    model_name = data.get("model_name", "google/gemma-2-2b-it")
+    dataset_size = data.get("dataset_size", "100k")
+    batch_size = data.get("batch_size", 10000)
+    email = data.get("email", "")
+    notify = data.get("notify_on_complete", True)
+
+    total_map = {"10k": 10000, "50k": 50000, "100k": 100000, "200k": 200000, "500k": 500000}
+    total_samples = total_map.get(dataset_size, 100000)
+
+    job = TrainingJob.objects.create(
+        user=request.user,
+        model_name=model_name,
+        dataset_size=dataset_size,
+        total_samples=total_samples,
+        batch_size=batch_size,
+        email=email,
+        notify_on_complete=notify,
+    )
+
+    t = threading.Thread(target=_run_training_job, args=(job.id,), daemon=True)
+    t.start()
+
+    return JsonResponse({
+        "id": job.id,
+        "status": job.status,
+        "message": "Training started!",
+    })
+
+
+@login_required
+@csrf_exempt
+def stop_training(request, job_id):
+    """Stop a running training job."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    job = get_object_or_404(TrainingJob, id=job_id, user=request.user)
+    job.status = "failed"
+    job.error_message = "Stopped by user"
+    job.save()
+    return JsonResponse({"status": "stopped"})
+
+
+@login_required
+def training_status(request, job_id):
+    """Get current status of a training job."""
+    job = get_object_or_404(TrainingJob, id=job_id, user=request.user)
+    return JsonResponse({
+        "id": job.id,
+        "status": job.status,
+        "current_round": job.current_round,
+        "total_rounds": job.total_rounds,
+        "progress": job.progress_percent(),
+        "current_loss": job.current_loss,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+        "error_message": job.error_message,
+        "model_name": job.model_name,
+    })

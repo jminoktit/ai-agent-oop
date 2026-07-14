@@ -2,6 +2,46 @@ from django.conf import settings
 from django.db import models
 
 
+class TrainingJob(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("running", "Running"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True, related_name="training_jobs"
+    )
+    model_name = models.CharField(max_length=255, default="google/gemma-2-2b-it")
+    dataset_size = models.CharField(max_length=10, default="100k")
+    total_samples = models.IntegerField(default=100000)
+    batch_size = models.IntegerField(default=10000)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    current_round = models.IntegerField(default=0)
+    total_rounds = models.IntegerField(default=10)
+    current_loss = models.FloatField(null=True, blank=True)
+    email = models.EmailField(help_text="Email for notifications")
+    notify_on_complete = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True, null=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Training {self.model_name} ({self.status})"
+
+    def progress_percent(self):
+        if self.total_rounds == 0:
+            return 0
+        return int((self.current_round / self.total_rounds) * 100)
+
+
 class Conversation(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
