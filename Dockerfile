@@ -1,12 +1,23 @@
-FROM python:3.11-slim
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
+# Install Python
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy requirements
+COPY AuraTrainer/requirements.txt .
 
-COPY . .
+# Install Python packages
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-EXPOSE 8000
+# Copy project
+COPY AuraTrainer/ .
 
-CMD gunicorn agent_project.wsgi --bind 0.0.0.0:$PORT
+# Set entrypoint
+ENTRYPOINT ["python3", "scripts/train_service.py"]
