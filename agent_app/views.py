@@ -361,7 +361,7 @@ from django.utils import timezone
 def _run_training_job(job_id):
     """Background thread that runs the actual training."""
     from .models import TrainingJob
-    import importlib, sys, os
+    import sys, os
 
     job = TrainingJob.objects.get(id=job_id)
     job.status = "running"
@@ -373,77 +373,28 @@ def _run_training_job(job_id):
         if trainer_dir not in sys.path:
             sys.path.insert(0, os.path.dirname(trainer_dir))
 
-        # Re-import inside thread to avoid Django module conflicts
-        from AuraTrainer.utils.gpu import GPUManager
-        from AuraTrainer.models.loader import ModelLoader
-        from AuraTrainer.models.lora import LoRAConfig
-        from AuraTrainer.data.loader import DatasetLoader
-        from AuraTrainer.data.formatter import DataFormatter
-        from AuraTrainer.data.sampler import DataSampler
-        from AuraTrainer.training.trainer import AuraTrainer
-        from AuraTrainer.training.callbacks import PerformanceCallback, MemoryCallback
-        from AuraTrainer.utils.logger import AuraLogger
-        import yaml
+        from AuraTrainer.cli import AuraTrainerCLI, TrainingConfig
 
-        gpu = GPUManager()
-        gpu_info = gpu.detect()
-        config = gpu.auto_configure(gpu_info)
-
-        logger = AuraLogger("AuraTrainerBackend")
-        logger.info(f"GPU: {gpu_info['name']}, Memory: {gpu_info['total_memory']}GB")
-
-        model_loader = ModelLoader()
-        model, tokenizer = model_loader.load(
+        config = TrainingConfig(
             model_name=job.model_name,
-            gpu_info=gpu_info,
-            config=config,
+            dataset_size=job.total_samples,
+            batch_size=job.batch_size,
+            num_epochs=3,
+            learning_rate=2e-4,
+            max_seq_length=1024,
+            output_dir=os.path.join(trainer_dir, "checkpoints", f"job_{job_id}"),
+            notify_email=job.email if job.notify_on_complete else "",
         )
 
-        lora = LoRAConfig()
-        model = lora.apply(model)
-
-        loader = DatasetLoader()
-        formatter = DataFormatter()
-        sampler = DataSampler()
-
-        total_rounds = max(1, job.total_samples // job.batch_size)
-        job.total_rounds = total_rounds
-        job.save()
-
-        all_metrics = []
-        for round_idx in range(total_rounds):
-            round_start = round_idx * job.batch_size
-            round_end = round_start + job.batch_size
-
-            dataset = loader.load_dataset(round_start, round_end)
-            dataset = formatter.format(dataset)
-
-            trainer_obj = AuraTrainer(
-                model=model,
-                tokenizer=tokenizer,
-                dataset=dataset,
-                config=config,
-                gpu_info=gpu_info,
-            )
-            trainer_obj.setup()
-            result = trainer_obj.train()
-
-            job.current_round = round_idx + 1
-            job.current_loss = result.get("loss", 0)
-            all_metrics.append(result)
-            job.save()
-            logger.info(f"Round {job.current_round}/{total_rounds} done, loss={job.current_loss}")
-
-        # Save final model
-        save_dir = os.path.join(trainer_dir, "checkpoints", f"job_{job_id}")
-        os.makedirs(save_dir, exist_ok=True)
-        model.save_pretrained(save_dir)
-        tokenizer.save_pretrained(save_dir)
+        cli = AuraTrainerCLI(config)
+        metrics = cli.run()
 
         job.status = "completed"
         job.completed_at = timezone.now()
+        job.current_round = job.total_rounds
+        if metrics.get("train_loss"):
+            job.current_loss = metrics["train_loss"]
         job.save()
-        logger.info(f"Training job {job_id} completed successfully!")
 
         # Send email
         if job.notify_on_complete and job.email:
