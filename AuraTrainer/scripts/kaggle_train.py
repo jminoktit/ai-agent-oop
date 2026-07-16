@@ -73,7 +73,7 @@ else:
 # ## 4. Import AuraTrainer OOP Classes
 
 # %%
-from AuraTrainer.cli import AuraTrainerCLI, TrainingConfig
+from AuraTrainer.core import AuraTrainer, TrainingConfig
 
 print("✅ AuraTrainer imported!")
 
@@ -100,8 +100,8 @@ print(f"  Learning rate: {config.learning_rate}")
 # ## 6. Run Training Pipeline
 
 # %%
-cli = AuraTrainerCLI(config)
-metrics = cli.run()
+trainer = AuraTrainer(config)
+metrics = trainer.run()
 
 # %% [markdown]
 # ## 7. View Results

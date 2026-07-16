@@ -26,7 +26,7 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q",
 # Add AuraTrainer to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from AuraTrainer.cli import AuraTrainerCLI, TrainingConfig
+from AuraTrainer.core import AuraTrainer, TrainingConfig
 
 
 def main():
@@ -43,8 +43,8 @@ def main():
         hf_token=os.getenv("HF_TOKEN", ""),
     )
 
-    cli = AuraTrainerCLI(config)
-    cli.run()
+    trainer = AuraTrainer(config)
+    trainer.run()
 
 
 if __name__ == "__main__":

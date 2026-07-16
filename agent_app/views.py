@@ -373,7 +373,7 @@ def _run_training_job(job_id):
         if trainer_dir not in sys.path:
             sys.path.insert(0, os.path.dirname(trainer_dir))
 
-        from AuraTrainer.cli import AuraTrainerCLI, TrainingConfig
+        from AuraTrainer.core import AuraTrainer, TrainingConfig
 
         config = TrainingConfig(
             model_name=job.model_name,
@@ -386,8 +386,8 @@ def _run_training_job(job_id):
             notify_email=job.email if job.notify_on_complete else "",
         )
 
-        cli = AuraTrainerCLI(config)
-        metrics = cli.run()
+        trainer = AuraTrainer(config)
+        metrics = trainer.run()
 
         job.status = "completed"
         job.completed_at = timezone.now()
