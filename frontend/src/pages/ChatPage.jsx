@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useLang } from '../i18n/LanguageContext';
 import { api } from '../api/client';
+import MessageContent from '../components/MessageContent';
 
 const AGENT_ICONS = {
   chat: '💬',
@@ -103,7 +104,7 @@ export default function ChatPage() {
         loadData();
       }
     } catch (err) {
-      setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: `**Error:** ${err.message}` }]);
     } finally {
       setLoading(false);
       inputRef.current?.focus();
@@ -325,7 +326,9 @@ export default function ChatPage() {
                 <div className="message-avatar">
                   {msg.role === 'user' ? '👤' : (AGENT_ICONS[activeAgent] || '🤖')}
                 </div>
-                <div className="message-content">{msg.content}</div>
+                <div className="message-content">
+                  <MessageContent content={msg.content} isUser={msg.role === 'user'} />
+                </div>
               </div>
             ))
           )}
