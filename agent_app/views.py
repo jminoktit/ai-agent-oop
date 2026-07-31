@@ -404,9 +404,9 @@ def _run_training_job(job_id):
                 body=(
                     f"Training completed successfully!\n\n"
                     f"Model: {job.model_name}\n"
-                    f"Total rounds: {total_rounds}\n"
-                    f"Final loss: {all_metrics[-1].get('loss', 'N/A') if all_metrics else 'N/A'}\n"
-                    f"Checkpoint saved to: {save_dir}\n"
+                    f"Total rounds: {job.total_rounds}\n"
+                    f"Final loss: {job.current_loss or 'N/A'}\n"
+                    f"Checkpoint saved to: {config.output_dir}\n"
                 ),
             )
 
