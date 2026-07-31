@@ -30,6 +30,23 @@ AGENT_KEY_TO_NAME = {v: k for k, v in AGENT_NAME_TO_KEY.items()}
 
 def login_view(request):
     if request.method == "POST":
+        # JSON API (React frontend)
+        if request.content_type == "application/json" or request.headers.get("Accept") == "application/json":
+            try:
+                data = json.loads(request.body)
+                username = data.get("username", "")
+                password = data.get("password", "")
+            except (json.JSONDecodeError, TypeError):
+                return JsonResponse({"error": "Invalid request body"}, status=400)
+
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                return JsonResponse({"status": "ok", "username": user.username})
+            else:
+                return JsonResponse({"error": "Invalid username or password"}, status=401)
+
+        # HTML form (Django templates)
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
@@ -42,6 +59,28 @@ def login_view(request):
 
 def register_view(request):
     if request.method == "POST":
+        # JSON API (React frontend)
+        if request.content_type == "application/json" or request.headers.get("Accept") == "application/json":
+            try:
+                data = json.loads(request.body)
+                username = data.get("username", "")
+                password1 = data.get("password1", "")
+                password2 = data.get("password2", "")
+            except (json.JSONDecodeError, TypeError):
+                return JsonResponse({"error": "Invalid request body"}, status=400)
+
+            if password1 != password2:
+                return JsonResponse({"error": "Passwords do not match"}, status=400)
+
+            from django.contrib.auth.models import User
+            if User.objects.filter(username=username).exists():
+                return JsonResponse({"error": "Username already taken"}, status=400)
+
+            user = User.objects.create_user(username=username, password=password1)
+            login(request, user)
+            return JsonResponse({"status": "ok", "username": user.username})
+
+        # HTML form (Django templates)
         form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
@@ -154,10 +193,11 @@ def chat(request):
     if agent_key:
         if agent_key in orchestrator.list_agents():
             orchestrator.active_agent = agent_key
+            request.session["active_agent"] = agent_key
         result = orchestrator.run(agent_key, user_input, conversation_id)
     else:
         result = orchestrator.auto_route(user_input, conversation_id)
-    agent = orchestrator.get_agent(orchestrator.active_agent or "chat")
+    agent = orchestrator.get_agent(request.session.get("active_agent", orchestrator.active_agent or "chat"))
 
     response_type = "text"
     image_url = None
@@ -177,7 +217,7 @@ def chat(request):
         pass
 
     if agent and agent.conversation_id:
-        conv = Conversation.objects.filter(id=agent.conversation_id, user=request.user).first()
+        conv = Conversation.objects.filter(id=agent.conversation_id).first()
         if conv and not conv.user_id:
             conv.user = request.user
             conv.save()
@@ -233,6 +273,7 @@ def switch_agent(request):
         return JsonResponse({"error": f"Agent '{name}' not found"}, status=400)
 
     orchestrator.active_agent = name
+    request.session["active_agent"] = name
     return JsonResponse({"active_agent": name, "agents": orchestrator.list_agents()})
 
 
@@ -243,7 +284,7 @@ def new_conversation(request):
         return JsonResponse({"error": "POST required"}, status=405)
 
     data = json.loads(request.body)
-    agent_name = data.get("agent", orchestrator.active_agent)
+    agent_name = data.get("agent", request.session.get("active_agent", orchestrator.active_agent))
     agent = orchestrator.get_agent(agent_name)
     if agent:
         agent.conversation_id = None
@@ -273,9 +314,10 @@ def conversation_detail(request, conv_id):
 
 @login_required
 def agent_info(request):
+    active_agent = request.session.get("active_agent", orchestrator.active_agent or "chat")
     return JsonResponse({
         "agents": orchestrator.list_agents(),
-        "active_agent": orchestrator.active_agent,
+        "active_agent": active_agent,
         "details": {n: a.to_dict() for n, a in orchestrator.agents.items()},
     })
 

@@ -17,8 +17,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await api.login(username, password);
-      window.location.href = '/';
+      const data = await api.login(username, password);
+      if (data.status === 'ok') {
+        window.location.href = '/';
+      } else {
+        setError(data.error || 'Invalid username or password');
+      }
     } catch (err) {
       setError(err.message || 'Invalid username or password');
     } finally {

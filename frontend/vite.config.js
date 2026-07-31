@@ -14,6 +14,8 @@ export default defineConfig({
       '/new-conversation': 'http://127.0.0.1:8000',
       '/conversation': 'http://127.0.0.1:8000',
       '/agent-info': 'http://127.0.0.1:8000',
+      '/conversations': 'http://127.0.0.1:8000',
+      '/user-info': 'http://127.0.0.1:8000',
       '/files': 'http://127.0.0.1:8000',
       '/training': 'http://127.0.0.1:8000',
       '/settings': 'http://127.0.0.1:8000',

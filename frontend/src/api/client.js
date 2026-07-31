@@ -48,14 +48,14 @@ export const api = {
   login: (username, password) =>
     request('/login/', {
       method: 'POST',
-      body: new URLSearchParams({ username, password }).toString(),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: { username, password },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     }),
   register: (username, password1, password2) =>
     request('/register/', {
       method: 'POST',
-      body: new URLSearchParams({ username, password1, password2 }).toString(),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: { username, password1, password2 },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     }),
   logout: () => request('/logout/'),
 
@@ -85,12 +85,16 @@ export const api = {
 
   // Files
   listFiles: () => request('/files/'),
-  uploadFile: (formData) =>
-    fetch(`${API_BASE}/files/upload/`, {
+  uploadFile: async (formData) => {
+    const res = await fetch(`${API_BASE}/files/upload/`, {
       method: 'POST',
       headers: { 'X-CSRFToken': CSRF_TOKEN() },
       body: formData,
-    }).then(r => r.json()),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+    return data;
+  },
   getFileContent: (id) => request(`/files/${id}/`),
   deleteFile: (id) => request(`/files/${id}/delete/`, { method: 'POST' }),
 

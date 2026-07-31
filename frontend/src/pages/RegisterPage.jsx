@@ -24,8 +24,12 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await api.register(username, password1, password2);
-      window.location.href = '/';
+      const data = await api.register(username, password1, password2);
+      if (data.status === 'ok') {
+        window.location.href = '/';
+      } else {
+        setError(data.error || 'Registration failed');
+      }
     } catch (err) {
       setError(err.message || 'Registration failed');
     } finally {
