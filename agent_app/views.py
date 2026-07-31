@@ -672,6 +672,12 @@ def update_profile(request):
         user_settings.theme = data["theme"]
     if "language" in data:
         user_settings.language = data["language"]
+    if "email_notifications" in data:
+        user_settings.email_notifications = data["email_notifications"]
+    if "training_notifications" in data:
+        user_settings.training_notifications = data["training_notifications"]
+    if "sound_enabled" in data:
+        user_settings.sound_enabled = data["sound_enabled"]
 
     user_settings.save()
     return JsonResponse({"status": "ok"})

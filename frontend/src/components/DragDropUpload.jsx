@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import { api } from '../api/client';
 
 export default function DragDropUpload({ onFileUploaded }) {
-  const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef(null);
 
@@ -11,26 +10,22 @@ export default function DragDropUpload({ onFileUploaded }) {
     e.stopPropagation();
   };
 
-  const handleDragIn = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
-  };
-
-  const handleDragOut = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(false);
-  };
-
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragging(false);
 
     const files = e.dataTransfer.files;
     if (files?.length) {
       uploadFiles(files);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only dismiss if leaving the overlay entirely
+    if (e.currentTarget === e.target) {
+      onFileUploaded(null);
     }
   };
 
@@ -60,11 +55,10 @@ export default function DragDropUpload({ onFileUploaded }) {
 
   return (
     <div
-      className={`drag-drop-zone ${dragging ? 'active' : ''} ${uploading ? 'uploading' : ''}`}
-      onDragEnter={handleDragIn}
-      onDragLeave={handleDragOut}
+      className="drag-drop-zone active"
       onDragOver={handleDrag}
       onDrop={handleDrop}
+      onDragLeave={handleDragLeave}
       onClick={() => inputRef.current?.click()}
     >
       <input
@@ -74,11 +68,9 @@ export default function DragDropUpload({ onFileUploaded }) {
         style={{ display: 'none' }}
         onChange={handleFileSelect}
       />
-      {uploading ? (
-        <span>📤 Uploading...</span>
-      ) : dragging ? (
-        <span>📂 Drop files here</span>
-      ) : null}
+      <span>
+        {uploading ? '📤 Uploading...' : '📂 Drop files here to upload'}
+      </span>
     </div>
   );
 }

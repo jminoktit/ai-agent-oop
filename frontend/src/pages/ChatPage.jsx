@@ -106,9 +106,10 @@ export default function ChatPage() {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let full = '';
+        let done = false;
         while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          const { done: streamDone, value } = await reader.read();
+          if (streamDone) break;
           const chunk = decoder.decode(value);
           const lines = chunk.split('\n');
           for (const line of lines) {
@@ -119,6 +120,7 @@ export default function ChatPage() {
                 const parsed = JSON.parse(data);
                 if (parsed.text) { full += parsed.text; setStreaming(full); }
                 if (parsed.done) {
+                  done = true;
                   setMessages((prev) => [...prev, { role: 'assistant', content: full }]);
                   setStreaming('');
                   if (parsed.conversation_id) { setActiveConvId(parsed.conversation_id); loadData(); }
@@ -127,7 +129,7 @@ export default function ChatPage() {
             }
           }
         }
-        if (full && !streaming) {
+        if (full && !done) {
           setMessages((prev) => [...prev, { role: 'assistant', content: full }]);
         }
       } else {
@@ -224,8 +226,8 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="app-layout" onDragOver={(e) => { e.preventDefault(); setDragFiles(true); }}>
-      {dragFiles && <DragDropUpload onFileUploaded={(f) => { handleFileUploaded(f); setDragFiles(false); }} />}
+    <div className="app-layout" onDragOver={(e) => { e.preventDefault(); if (e.dataTransfer.types.includes('Files')) setDragFiles(true); }}>
+      {dragFiles && <DragDropUpload onFileUploaded={(f) => { if (f) handleFileUploaded(f); setDragFiles(false); }} />}
 
       {/* SIDEBAR */}
       <aside className="app-sidebar">
