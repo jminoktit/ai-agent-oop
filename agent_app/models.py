@@ -2,6 +2,72 @@ from django.conf import settings
 from django.db import models
 
 
+class UserSettings(models.Model):
+    THEME_CHOICES = [
+        ("dark", "Dark"),
+        ("light", "Light"),
+        ("auto", "Auto"),
+    ]
+
+    LANGUAGE_CHOICES = [
+        ("en", "English"),
+        ("ar", "Arabic"),
+        ("auto", "Auto"),
+    ]
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="settings"
+    )
+
+    # Profile
+    display_name = models.CharField(max_length=100, blank=True, default="")
+    avatar_url = models.URLField(blank=True, default="")
+
+    # Theme
+    theme = models.CharField(max_length=10, choices=THEME_CHOICES, default="dark")
+    language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default="en")
+
+    # Chat
+    default_agent = models.CharField(max_length=50, default="chat")
+    show_timestamps = models.BooleanField(default=True)
+    send_on_enter = models.BooleanField(default=True)
+    font_size = models.IntegerField(default=14)
+
+    # Notifications
+    email_notifications = models.BooleanField(default=True)
+    training_notifications = models.BooleanField(default=True)
+    sound_enabled = models.BooleanField(default=True)
+
+    # Training
+    default_model = models.CharField(max_length=255, default="google/gemma-2-2b-it")
+    default_dataset_size = models.CharField(max_length=10, default="100k")
+    default_epochs = models.IntegerField(default=3)
+    default_learning_rate = models.FloatField(default=2e-4)
+
+    # API Keys (encrypted in production)
+    openai_api_key = models.CharField(max_length=255, blank=True, default="")
+    huggingface_token = models.CharField(max_length=255, blank=True, default="")
+    smtp_user = models.CharField(max_length=255, blank=True, default="")
+    smtp_pass = models.CharField(max_length=255, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "User Settings"
+        verbose_name_plural = "User Settings"
+
+    def __str__(self):
+        return f"Settings for {self.user.username}"
+
+    @classmethod
+    def get_or_create(cls, user):
+        """Get or create settings for a user."""
+        settings_obj, created = cls.objects.get_or_create(user=user)
+        return settings_obj
+
+
 class TrainingJob(models.Model):
     STATUS_CHOICES = [
         ("pending", "Pending"),

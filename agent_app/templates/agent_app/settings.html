@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - AI Agent OOP</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .nav { background: #1e293b; border-bottom: 1px solid #334155; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+        .nav h1 { font-size: 1.2rem; color: #38bdf8; }
+        .nav a { color: #94a3b8; text-decoration: none; padding: .4rem .8rem; border-radius: .4rem; transition: .2s; }
+        .nav a:hover { background: #334155; color: #e2e8f0; }
+        .nav a.active { background: #0284c7; color: white; }
+        .container { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem; }
+
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: .8rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card h2 { color: #38bdf8; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid #334155; padding-bottom: .5rem; }
+        .card h3 { color: #94a3b8; margin: 1rem 0 .5rem; font-size: .9rem; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-group { display: flex; flex-direction: column; gap: .4rem; }
+        .form-group.full { grid-column: 1 / -1; }
+        .form-group label { font-size: .85rem; color: #94a3b8; }
+        .form-group select, .form-group input, .form-group textarea {
+            padding: .6rem .8rem; border: 1px solid #334155; border-radius: .4rem;
+            background: #0f172a; color: #e2e8f0; font-size: .9rem; font-family: inherit;
+        }
+        .form-group select:focus, .form-group input:focus, .form-group textarea:focus {
+            outline: none; border-color: #38bdf8;
+        }
+        .form-group .hint { font-size: .75rem; color: #64748b; }
+
+        .checkbox-group { display: flex; align-items: center; gap: .5rem; }
+        .checkbox-group input[type="checkbox"] { width: auto; accent-color: #0284c7; }
+
+        .btn { padding: .7rem 1.5rem; border: none; border-radius: .5rem; cursor: pointer; font-size: .9rem; font-weight: 600; transition: .2s; }
+        .btn-primary { background: #0284c7; color: white; }
+        .btn-primary:hover { background: #0369a1; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-sm { padding: .4rem .8rem; font-size: .8rem; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        .tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .tab { padding: .5rem 1rem; border: 1px solid #334155; border-radius: .4rem; background: #0f172a; color: #94a3b8; cursor: pointer; transition: .2s; }
+        .tab:hover { background: #334155; color: #e2e8f0; }
+        .tab.active { background: #0284c7; color: white; border-color: #0284c7; }
+
+        .section { display: none; }
+        .section.active { display: block; }
+
+        .toast { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); background: #0284c7; color: white; padding: .8rem 1.5rem; border-radius: .5rem; z-index: 1000; display: none; font-size: .9rem; }
+        .toast.error { background: #dc2626; }
+        .toast.show { display: block; animation: fadeInOut 3s ease forwards; }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(-50%) translateY(-10px); } 10% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+        .danger-zone { border: 1px solid #dc2626; border-radius: .8rem; padding: 1.5rem; background: #1e0a0a; }
+        .danger-zone h2 { color: #dc2626; border-bottom-color: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <h1>AI Agent OOP</h1>
+        <a href="{% url 'index' %}">Chat</a>
+        <a href="{% url 'training_dashboard' %}">Training</a>
+        <a href="{% url 'settings_view' %}" class="active">Settings</a>
+        <a href="{% url 'logout' %}" style="margin-right: auto; color: #ef4444;">Logout</a>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showSection('profile')">Profile</button>
+            <button class="tab" onclick="showSection('chat')">Chat</button>
+            <button class="tab" onclick="showSection('training')">Training</button>
+            <button class="tab" onclick="showSection('notifications')">Notifications</button>
+            <button class="tab" onclick="showSection('api')">API Keys</button>
+        </div>
+
+        <form id="settingsForm" method="POST">
+            {% csrf_token %}
+
+            <!-- Profile -->
+            <div id="section-profile" class="section active">
+                <div class="card">
+                    <h2>Profile</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Display Name</label>
+                            <input type="text" name="display_name" value="{{ settings.display_name }}" placeholder="Your name">
+                        </div>
+                        <div class="form-group">
+                            <label>Avatar URL</label>
+                            <input type="url" name="avatar_url" value="{{ settings.avatar_url }}" placeholder="https://...">
+                        </div>
+                        <div class="form-group">
+                            <label>Theme</label>
+                            <select name="theme">
+                                <option value="dark" {% if settings.theme == "dark" %}selected{% endif %}>Dark</option>
+                                <option value="light" {% if settings.theme == "light" %}selected{% endif %}>Light</option>
+                                <option value="auto" {% if settings.theme == "auto" %}selected{% endif %}>Auto</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Language</label>
+                            <select name="language">
+                                <option value="en" {% if settings.language == "en" %}selected{% endif %}>English</option>
+                                <option value="ar" {% if settings.language == "ar" %}selected{% endif %}>Arabic</option>
+                                <option value="auto" {% if settings.language == "auto" %}selected{% endif %}>Auto</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat -->
+            <div id="section-chat" class="section">
+                <div class="card">
+                    <h2>Chat Settings</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Default Agent</label>
+                            <select name="default_agent">
+                                <option value="chat" {% if settings.default_agent == "chat" %}selected{% endif %}>ChatBot</option>
+                                <option value="code" {% if settings.default_agent == "code" %}selected{% endif %}>CodeBot</option>
+                                <option value="data" {% if settings.default_agent == "data" %}selected{% endif %}>DataBot</option>
+                                <option value="research" {% if settings.default_agent == "research" %}selected{% endif %}>ResearchBot</option>
+                                <option value="planner" {% if settings.default_agent == "planner" %}selected{% endif %}>PlannerBot</option>
+                                <option value="media" {% if settings.default_agent == "media" %}selected{% endif %}>MediaBot</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Font Size</label>
+                            <select name="font_size">
+                                <option value="12" {% if settings.font_size == 12 %}selected{% endif %}>12px</option>
+                                <option value="14" {% if settings.font_size == 14 %}selected{% endif %}>14px</option>
+                                <option value="16" {% if settings.font_size == 16 %}selected{% endif %}>16px</option>
+                                <option value="18" {% if settings.font_size == 18 %}selected{% endif %}>18px</option>
+                                <option value="20" {% if settings.font_size == 20 %}selected{% endif %}>20px</option>
+                            </select>
+                        </div>
+                        <div class="form-group full">
+                            <div class="checkbox-group">
+                                <input type="checkbox" name="show_timestamps" id="show_timestamps" {% if settings.show_timestamps %}checked{% endif %}>
+                                <label for="show_timestamps">Show timestamps in chat</label>
+                            </div>
+                        </div>
+                        <div class="form-group full">
+                            <div class="checkbox-group">
+                                <input type="checkbox" name="send_on_enter" id="send_on_enter" {% if settings.send_on_enter %}checked{% endif %}>
+                                <label for="send_on_enter">Send message on Enter (Shift+Enter for new line)</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Training -->
+            <div id="section-training" class="section">
+                <div class="card">
+                    <h2>Training Defaults</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Default Model</label>
+                            <select name="default_model">
+                                <option value="google/gemma-2-2b-it" {% if settings.default_model == "google/gemma-2-2b-it" %}selected{% endif %}>Gemma 2B</option>
+                                <option value="TinyLlama/TinyLlama-1.1B-Chat-v1.0" {% if settings.default_model == "TinyLlama/TinyLlama-1.1B-Chat-v1.0" %}selected{% endif %}>TinyLlama 1.1B</option>
+                                <option value="Qwen/Qwen2-1.5B" {% if settings.default_model == "Qwen/Qwen2-1.5B" %}selected{% endif %}>Qwen2 1.5B</option>
+                                <option value="microsoft/phi-2" {% if settings.default_model == "microsoft/phi-2" %}selected{% endif %}>Phi-2 2.7B</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Default Dataset Size</label>
+                            <select name="default_dataset_size">
+                                <option value="10k" {% if settings.default_dataset_size == "10k" %}selected{% endif %}>10K</option>
+                                <option value="50k" {% if settings.default_dataset_size == "50k" %}selected{% endif %}>50K</option>
+                                <option value="100k" {% if settings.default_dataset_size == "100k" %}selected{% endif %}>100K</option>
+                                <option value="200k" {% if settings.default_dataset_size == "200k" %}selected{% endif %}>200K</option>
+                                <option value="500k" {% if settings.default_dataset_size == "500k" %}selected{% endif %}>500K</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Default Epochs</label>
+                            <input type="number" name="default_epochs" value="{{ settings.default_epochs }}" min="1" max="10">
+                        </div>
+                        <div class="form-group">
+                            <label>Default Learning Rate</label>
+                            <input type="number" name="default_learning_rate" value="{{ settings.default_learning_rate }}" step="0.0001" min="0.00001" max="0.01">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications -->
+            <div id="section-notifications" class="section">
+                <div class="card">
+                    <h2>Notifications</h2>
+                    <div class="form-grid">
+                        <div class="form-group full">
+                            <div class="checkbox-group">
+                                <input type="checkbox" name="email_notifications" id="email_notifications" {% if settings.email_notifications %}checked{% endif %}>
+                                <label for="email_notifications">Enable email notifications</label>
+                            </div>
+                        </div>
+                        <div class="form-group full">
+                            <div class="checkbox-group">
+                                <input type="checkbox" name="training_notifications" id="training_notifications" {% if settings.training_notifications %}checked{% endif %}>
+                                <label for="training_notifications">Notify when training completes</label>
+                            </div>
+                        </div>
+                        <div class="form-group full">
+                            <div class="checkbox-group">
+                                <input type="checkbox" name="sound_enabled" id="sound_enabled" {% if settings.sound_enabled %}checked{% endif %}>
+                                <label for="sound_enabled">Enable sound effects</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Keys -->
+            <div id="section-api" class="section">
+                <div class="card">
+                    <h2>API Keys</h2>
+                    <p style="font-size: .85rem; color: #64748b; margin-bottom: 1rem;">API keys are stored locally and never sent to our servers.</p>
+                    <div class="form-grid">
+                        <div class="form-group full">
+                            <label>HuggingFace Token</label>
+                            <input type="password" name="huggingface_token" value="{{ settings.huggingface_token }}" placeholder="hf_...">
+                            <span class="hint">Required for Gemma models. Get from https://huggingface.co/settings/tokens</span>
+                        </div>
+                        <div class="form-group full">
+                            <label>OpenAI API Key</label>
+                            <input type="password" name="openai_api_key" value="{{ settings.openai_api_key }}" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label>SMTP Email</label>
+                            <input type="email" name="smtp_user" value="{{ settings.smtp_user }}" placeholder="your@gmail.com">
+                        </div>
+                        <div class="form-group">
+                            <label>SMTP App Password</label>
+                            <input type="password" name="smtp_pass" value="{{ settings.smtp_pass }}" placeholder="xxxx-xxxx-xxxx-xxxx">
+                            <span class="hint">Gmail: https://myaccount.google.com/apppasswords</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: .5rem; justify-content: flex-end; margin-top: 1rem;">
+                <button type="button" class="btn" style="background: #334155; color: #94a3b8;" onclick="location.reload()">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="saveBtn">Save Settings</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast show' + (isError ? ' error' : '');
+            setTimeout(() => t.className = 'toast', 3000);
+        }
+
+        function showSection(name) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('section-' + name).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        document.getElementById('settingsForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                const formData = new FormData(this);
+                const res = await fetch('{% url "settings_view" %}', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('Settings saved!');
+                } else {
+                    showToast(data.error || 'Failed to save', true);
+                }
+            } catch (e) {
+                showToast('Network error', true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save Settings';
+            }
+        });
+    </script>
+</body>
+</html>

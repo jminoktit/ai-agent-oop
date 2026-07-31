@@ -25,4 +25,11 @@ urlpatterns = [
     path("training/start/", views.start_training, name="start_training"),
     path("training/<int:job_id>/status/", views.training_status, name="training_status"),
     path("training/<int:job_id>/stop/", views.stop_training, name="stop_training"),
+    # ── Settings ──
+    path("settings/", views.settings_view, name="settings_view"),
+    path("settings/profile/", views.update_profile, name="update_profile"),
+    path("settings/chat/", views.update_chat_settings, name="update_chat_settings"),
+    path("settings/training/", views.update_training_settings, name="update_training_settings"),
+    path("settings/api/", views.update_api_keys, name="update_api_keys"),
+    path("settings/get/", views.get_settings, name="get_settings"),
 ]

@@ -525,3 +525,179 @@ def training_status(request, job_id):
         "error_message": job.error_message,
         "model_name": job.model_name,
     })
+
+
+# ──────────────── SETTINGS ────────────────
+
+from .models import UserSettings
+
+
+@login_required
+def settings_view(request):
+    """User settings page."""
+    user_settings = UserSettings.get_or_create(request.user)
+
+    if request.method == "POST":
+        # Profile
+        user_settings.display_name = request.POST.get("display_name", "")
+        user_settings.avatar_url = request.POST.get("avatar_url", "")
+
+        # Theme
+        user_settings.theme = request.POST.get("theme", "dark")
+        user_settings.language = request.POST.get("language", "en")
+
+        # Chat
+        user_settings.default_agent = request.POST.get("default_agent", "chat")
+        user_settings.show_timestamps = request.POST.get("show_timestamps") == "on"
+        user_settings.send_on_enter = request.POST.get("send_on_enter") == "on"
+        try:
+            user_settings.font_size = int(request.POST.get("font_size", 14))
+        except (ValueError, TypeError):
+            user_settings.font_size = 14
+
+        # Notifications
+        user_settings.email_notifications = request.POST.get("email_notifications") == "on"
+        user_settings.training_notifications = request.POST.get("training_notifications") == "on"
+        user_settings.sound_enabled = request.POST.get("sound_enabled") == "on"
+
+        # Training
+        user_settings.default_model = request.POST.get("default_model", "google/gemma-2-2b-it")
+        user_settings.default_dataset_size = request.POST.get("default_dataset_size", "100k")
+        try:
+            user_settings.default_epochs = int(request.POST.get("default_epochs", 3))
+        except (ValueError, TypeError):
+            user_settings.default_epochs = 3
+        try:
+            user_settings.default_learning_rate = float(request.POST.get("default_learning_rate", 2e-4))
+        except (ValueError, TypeError):
+            user_settings.default_learning_rate = 2e-4
+
+        # API Keys
+        user_settings.openai_api_key = request.POST.get("openai_api_key", "")
+        user_settings.huggingface_token = request.POST.get("huggingface_token", "")
+        user_settings.smtp_user = request.POST.get("smtp_user", "")
+        user_settings.smtp_pass = request.POST.get("smtp_pass", "")
+
+        user_settings.save()
+
+        return JsonResponse({"status": "ok", "message": "Settings saved!"})
+
+    return render(request, "agent_app/settings.html", {
+        "settings": user_settings,
+        "user_name": request.user.username,
+    })
+
+
+@login_required
+@csrf_exempt
+def update_profile(request):
+    """Update user profile (AJAX)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    user_settings = UserSettings.get_or_create(request.user)
+    data = json.loads(request.body)
+
+    if "display_name" in data:
+        user_settings.display_name = data["display_name"]
+    if "avatar_url" in data:
+        user_settings.avatar_url = data["avatar_url"]
+    if "theme" in data:
+        user_settings.theme = data["theme"]
+    if "language" in data:
+        user_settings.language = data["language"]
+
+    user_settings.save()
+    return JsonResponse({"status": "ok"})
+
+
+@login_required
+@csrf_exempt
+def update_chat_settings(request):
+    """Update chat settings (AJAX)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    user_settings = UserSettings.get_or_create(request.user)
+    data = json.loads(request.body)
+
+    if "default_agent" in data:
+        user_settings.default_agent = data["default_agent"]
+    if "show_timestamps" in data:
+        user_settings.show_timestamps = data["show_timestamps"]
+    if "send_on_enter" in data:
+        user_settings.send_on_enter = data["send_on_enter"]
+    if "font_size" in data:
+        user_settings.font_size = data["font_size"]
+
+    user_settings.save()
+    return JsonResponse({"status": "ok"})
+
+
+@login_required
+@csrf_exempt
+def update_training_settings(request):
+    """Update training defaults (AJAX)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    user_settings = UserSettings.get_or_create(request.user)
+    data = json.loads(request.body)
+
+    if "default_model" in data:
+        user_settings.default_model = data["default_model"]
+    if "default_dataset_size" in data:
+        user_settings.default_dataset_size = data["default_dataset_size"]
+    if "default_epochs" in data:
+        user_settings.default_epochs = data["default_epochs"]
+    if "default_learning_rate" in data:
+        user_settings.default_learning_rate = data["default_learning_rate"]
+
+    user_settings.save()
+    return JsonResponse({"status": "ok"})
+
+
+@login_required
+@csrf_exempt
+def update_api_keys(request):
+    """Update API keys (AJAX)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    user_settings = UserSettings.get_or_create(request.user)
+    data = json.loads(request.body)
+
+    if "openai_api_key" in data:
+        user_settings.openai_api_key = data["openai_api_key"]
+    if "huggingface_token" in data:
+        user_settings.huggingface_token = data["huggingface_token"]
+    if "smtp_user" in data:
+        user_settings.smtp_user = data["smtp_user"]
+    if "smtp_pass" in data:
+        user_settings.smtp_pass = data["smtp_pass"]
+
+    user_settings.save()
+    return JsonResponse({"status": "ok"})
+
+
+@login_required
+def get_settings(request):
+    """Get user settings (AJAX)."""
+    user_settings = UserSettings.get_or_create(request.user)
+    return JsonResponse({
+        "display_name": user_settings.display_name,
+        "avatar_url": user_settings.avatar_url,
+        "theme": user_settings.theme,
+        "language": user_settings.language,
+        "default_agent": user_settings.default_agent,
+        "show_timestamps": user_settings.show_timestamps,
+        "send_on_enter": user_settings.send_on_enter,
+        "font_size": user_settings.font_size,
+        "email_notifications": user_settings.email_notifications,
+        "training_notifications": user_settings.training_notifications,
+        "sound_enabled": user_settings.sound_enabled,
+        "default_model": user_settings.default_model,
+        "default_dataset_size": user_settings.default_dataset_size,
+        "default_epochs": user_settings.default_epochs,
+        "default_learning_rate": user_settings.default_learning_rate,
+    })
