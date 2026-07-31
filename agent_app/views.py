@@ -3,7 +3,7 @@ import json
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
@@ -113,6 +113,7 @@ def chat(request):
     data = json.loads(request.body)
     user_input = data.get("message", "").strip()
     conversation_id = data.get("conversation_id")
+    stream = data.get("stream", False)
 
     if not user_input:
         return JsonResponse({"error": "Message is required"}, status=400)
@@ -185,6 +186,24 @@ def chat(request):
     if agent and agent.conversation_id:
         qs = Message.objects.filter(conversation_id=agent.conversation_id).order_by("created_at")
         messages = [{"role": m.role, "content": m.content} for m in qs]
+
+    # Streaming response (SSE)
+    if stream:
+        def event_stream():
+            # Send response in chunks for streaming effect
+            chunk_size = 20
+            full_text = result if isinstance(result, str) else str(result)
+            for i in range(0, len(full_text), chunk_size):
+                chunk = full_text[i:i + chunk_size]
+                yield f"data: {json.dumps({'text': chunk})}\n\n"
+            # Send completion event
+            yield f"data: {json.dumps({'done': True, 'conversation_id': agent.conversation_id if agent else None})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response
 
     response_data = {
         "response": result,
