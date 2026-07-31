@@ -68,12 +68,39 @@ def index(request):
         "created_at": c.created_at.isoformat(),
         "msg_count": c.messages.count(),
     } for c in conversations]
+    if request.headers.get("Accept") == "application/json":
+        return JsonResponse({"conversations": conv_list})
     return render(request, "agent_app/index.html", {
         "agents": orchestrator.list_agents(),
         "active_agent": orchestrator.active_agent,
         "conversations": conversations,
         "conv_list_json": json.dumps(conv_list),
         "user_name": request.user.username,
+    })
+
+
+@login_required
+def conversations_list(request):
+    """Return conversations as JSON."""
+    conversations = Conversation.objects.filter(user=request.user)[:20]
+    return JsonResponse({
+        "conversations": [{
+            "id": c.id,
+            "display_name": c.display_name(),
+            "agent_name": c.agent_name,
+            "is_pinned": c.is_pinned,
+            "created_at": c.created_at.isoformat(),
+            "msg_count": c.messages.count(),
+        } for c in conversations],
+    })
+
+
+@login_required
+def user_info(request):
+    """Return current user info as JSON."""
+    return JsonResponse({
+        "username": request.user.username,
+        "email": request.user.email,
     })
 
 
@@ -451,8 +478,28 @@ def _send_email(to_email, subject, body):
 
 @login_required
 def training_dashboard(request):
-    """Training dashboard page."""
+    """Training dashboard page or JSON list."""
     jobs = TrainingJob.objects.filter(user=request.user)[:20]
+    if request.headers.get("Accept") == "application/json":
+        return JsonResponse({
+            "jobs": [{
+                "id": j.id,
+                "model_name": j.model_name,
+                "dataset_size": j.dataset_size,
+                "total_samples": j.total_samples,
+                "batch_size": j.batch_size,
+                "status": j.status,
+                "current_round": j.current_round,
+                "total_rounds": j.total_rounds,
+                "current_loss": j.current_loss,
+                "email": j.email,
+                "progress": j.progress_percent(),
+                "error_message": j.error_message,
+                "started_at": j.started_at.isoformat() if j.started_at else None,
+                "completed_at": j.completed_at.isoformat() if j.completed_at else None,
+                "created_at": j.created_at.isoformat(),
+            } for j in jobs],
+        })
     return render(request, "agent_app/training.html", {
         "jobs": jobs,
         "user_name": request.user.username,
