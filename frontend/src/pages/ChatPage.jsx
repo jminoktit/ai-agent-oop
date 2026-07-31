@@ -8,6 +8,10 @@ import VoiceInput from '../components/VoiceInput';
 import CommandPalette from '../components/CommandPalette';
 import ThemeSwitcher from '../components/ThemeSwitcher';
 import DragDropUpload from '../components/DragDropUpload';
+import PromptTemplates from '../components/PromptTemplates';
+import MessageSearch from '../components/MessageSearch';
+import ChatInfoPanel from '../components/ChatInfoPanel';
+import UsageStats from '../components/UsageStats';
 import { exportAsMarkdown, exportAsJson } from '../utils/export';
 
 const AGENT_ICONS = { chat: '💬', code: '💻', data: '📊', research: '🔍', planner: '📋', media: '🎨' };
@@ -29,7 +33,9 @@ export default function ChatPage() {
   const [renameId, setRenameId] = useState(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
   const [dragFiles, setDragFiles] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [toast, setToast] = useState(null);
 
   const messagesEndRef = useRef(null);
@@ -38,17 +44,17 @@ export default function ChatPage() {
   useEffect(() => { loadData(); }, []);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, streaming]);
 
-  // Ctrl+K shortcut
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        setCmdOpen((prev) => !prev);
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setCmdOpen(prev => !prev); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); setPromptOpen(prev => !prev); }
+      if (e.key === 'F11') { e.preventDefault(); setFullscreen(prev => !prev); }
+      if (e.key === 'Escape' && fullscreen) { setFullscreen(false); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [fullscreen]);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -87,13 +93,12 @@ export default function ChatPage() {
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     const userMsg = { role: 'user', content: input.trim() };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
     setStreaming('');
 
     try {
-      // Try streaming first
       const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1];
       const res = await fetch('/chat/', {
         method: 'POST',
@@ -102,7 +107,6 @@ export default function ChatPage() {
       });
 
       if (res.headers.get('content-type')?.includes('text/event-stream')) {
-        // Streaming response
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let full = '';
@@ -121,7 +125,7 @@ export default function ChatPage() {
                 if (parsed.text) { full += parsed.text; setStreaming(full); }
                 if (parsed.done) {
                   done = true;
-                  setMessages((prev) => [...prev, { role: 'assistant', content: full }]);
+                  setMessages(prev => [...prev, { role: 'assistant', content: full }]);
                   setStreaming('');
                   if (parsed.conversation_id) { setActiveConvId(parsed.conversation_id); loadData(); }
                 }
@@ -130,10 +134,9 @@ export default function ChatPage() {
           }
         }
         if (full && !done) {
-          setMessages((prev) => [...prev, { role: 'assistant', content: full }]);
+          setMessages(prev => [...prev, { role: 'assistant', content: full }]);
         }
       } else {
-        // Fallback: normal JSON response
         const data = await res.json();
         setMessages(data.messages || [...messages, userMsg, { role: 'assistant', content: data.response }]);
         setActiveAgent(data.active_agent);
@@ -143,7 +146,7 @@ export default function ChatPage() {
         }
       }
     } catch (err) {
-      setMessages((prev) => [...prev, { role: 'assistant', content: `**Error:** ${err.message}` }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `**Error:** ${err.message}` }]);
     } finally {
       setLoading(false);
       setStreaming('');
@@ -160,7 +163,7 @@ export default function ChatPage() {
     if (!confirm('Delete this conversation?')) return;
     try {
       await api.deleteConversation(id);
-      setConversations((prev) => prev.filter((c) => c.id !== id));
+      setConversations(prev => prev.filter(c => c.id !== id));
       if (activeConvId === id) { setActiveConvId(null); setMessages([]); }
     } catch (err) { console.error(err); }
   };
@@ -169,7 +172,7 @@ export default function ChatPage() {
     e?.stopPropagation();
     try {
       const data = await api.togglePin(id);
-      setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, is_pinned: data.is_pinned } : c)));
+      setConversations(prev => prev.map(c => c.id === id ? { ...c, is_pinned: data.is_pinned } : c));
     } catch (err) { console.error(err); }
   };
 
@@ -177,7 +180,7 @@ export default function ChatPage() {
     if (!renameTitle.trim()) return;
     try {
       const data = await api.renameConversation(id, renameTitle);
-      setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, display_name: data.display_name } : c)));
+      setConversations(prev => prev.map(c => c.id === id ? { ...c, display_name: data.display_name } : c));
       setRenameId(null);
     } catch (err) { console.error(err); }
   };
@@ -190,7 +193,7 @@ export default function ChatPage() {
   };
 
   const handleVoiceResult = (text) => {
-    setInput((prev) => prev ? prev + ' ' + text : text);
+    setInput(prev => prev ? prev + ' ' + text : text);
     inputRef.current?.focus();
   };
 
@@ -207,17 +210,30 @@ export default function ChatPage() {
       case 'gotoSettings': navigate('/settings'); break;
       case 'exportMd': exportAsMarkdown(messages, activeConvId ? `Chat ${activeConvId}` : 'New Chat'); showToast('Exported as Markdown'); break;
       case 'exportJson': exportAsJson(messages, activeConvId ? `Chat ${activeConvId}` : 'New Chat'); showToast('Exported as JSON'); break;
+      case 'promptTemplates': setPromptOpen(true); break;
+      case 'fullscreen': setFullscreen(prev => !prev); break;
+      case 'usageStats': break; // handled separately
     }
   };
 
   const handleFileUploaded = (file) => {
+    if (!file) return;
     showToast(`Uploaded: ${file.filename}`);
     if (file.content_text) {
-      setInput((prev) => prev + `\n\n[File: ${file.filename}]\n${file.content_text.slice(0, 2000)}`);
+      setInput(prev => prev + `\n\n[File: ${file.filename}]\n${file.content_text.slice(0, 2000)}`);
     }
   };
 
   const handleLogout = async () => { try { await api.logout(); } catch {} window.location.href = '/login/'; };
+
+  const handleJumpToMessage = (index) => {
+    const msgElements = document.querySelectorAll('.message');
+    if (msgElements[index]) {
+      msgElements[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      msgElements[index].classList.add('message-flash');
+      setTimeout(() => msgElements[index]?.classList.remove('message-flash'), 2000);
+    }
+  };
 
   const sortedConversations = [...conversations].sort((a, b) => {
     if (a.is_pinned && !b.is_pinned) return -1;
@@ -226,83 +242,86 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="app-layout" onDragOver={(e) => { e.preventDefault(); if (e.dataTransfer.types.includes('Files')) setDragFiles(true); }}>
-      {dragFiles && <DragDropUpload onFileUploaded={(f) => { if (f) handleFileUploaded(f); setDragFiles(false); }} />}
+    <div className={`app-layout ${fullscreen ? 'fullscreen-mode' : ''}`} onDragOver={e => { e.preventDefault(); if (e.dataTransfer.types.includes('Files')) setDragFiles(true); }}>
+      {dragFiles && <DragDropUpload onFileUploaded={f => { if (f) handleFileUploaded(f); setDragFiles(false); }} />}
 
-      {/* SIDEBAR */}
-      <aside className="app-sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="logo-icon">AB</div>
-            <div>
-              <h1>Aura Book</h1>
-              <span>AI Agent Platform</span>
-            </div>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <Link to="/" className="active">{t('chat')}</Link>
-          <Link to="/training">{t('training')}</Link>
-          <Link to="/settings">{t('settings')}</Link>
-        </nav>
-
-        <div className="sidebar-section">
-          <h3>{t('conversations')}</h3>
-          <button className="new-chat-btn" onClick={handleNewChat}>+ {t('newChat')}</button>
-        </div>
-
-        <div className="conversations-list">
-          {sortedConversations.length === 0 ? (
-            <div className="empty-state" style={{ padding: '30px 10px' }}>
-              <div className="empty-icon">💬</div>
-              <p>{t('noConversations')}</p>
-            </div>
-          ) : sortedConversations.map((conv) => (
-            <div key={conv.id} className={`conversation-item ${activeConvId === conv.id ? 'active' : ''}`} onClick={() => selectConversation(conv)}>
-              <div className="conv-icon" style={{ background: (AGENT_COLORS[conv.agent_name] || '#6c5ce7') + '22', color: AGENT_COLORS[conv.agent_name] || '#6c5ce7' }}>
-                {AGENT_ICONS[conv.agent_name] || '💬'}
-              </div>
-              <div className="conv-info">
-                {renameId === conv.id ? (
-                  <input className="settings-input" value={renameTitle} onChange={(e) => setRenameTitle(e.target.value)}
-                    onBlur={() => handleRename(conv.id)} onKeyDown={(e) => e.key === 'Enter' && handleRename(conv.id)}
-                    autoFocus onClick={(e) => e.stopPropagation()} style={{ padding: '4px 8px', fontSize: '13px' }} />
-                ) : <div className="conv-title">{conv.display_name}</div>}
-                <div className="conv-agent">{conv.agent_name} {conv.is_pinned ? '📌' : ''}</div>
-              </div>
-              <div className="conv-actions">
-                <button className="conv-action-btn" onClick={(e) => { e.stopPropagation(); setRenameId(conv.id); setRenameTitle(conv.display_name); }}>✏️</button>
-                <button className="conv-action-btn" onClick={(e) => handlePin(conv.id, e)}>📌</button>
-                <button className="conv-action-btn" onClick={(e) => handleClear(conv.id, e)}>🗑️</button>
-                <button className="conv-action-btn danger" onClick={(e) => handleDelete(conv.id, e)}>✕</button>
+      {/* SIDEBAR - hidden in fullscreen */}
+      {!fullscreen && (
+        <aside className="app-sidebar">
+          <div className="sidebar-header">
+            <div className="sidebar-logo">
+              <div className="logo-icon">AB</div>
+              <div>
+                <h1>Aura Book</h1>
+                <span>AI Agent Platform</span>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        <div className="sidebar-footer">
-          <div className="user-info">
-            <div className="user-avatar">{userName?.charAt(0)?.toUpperCase() || 'U'}</div>
-            <div className="user-details">
-              <div className="user-name">{userName}</div>
-              <div className="user-role">{t('activeAgent')}: {activeAgent}</div>
+          <nav className="sidebar-nav">
+            <Link to="/" className="active">{t('chat')}</Link>
+            <Link to="/training">{t('training')}</Link>
+            <Link to="/settings">{t('settings')}</Link>
+          </nav>
+
+          <div className="sidebar-section">
+            <h3>{t('conversations')}</h3>
+            <button className="new-chat-btn" onClick={handleNewChat}>+ {t('newChat')}</button>
+          </div>
+
+          <div className="conversations-list">
+            {sortedConversations.length === 0 ? (
+              <div className="empty-state" style={{ padding: '30px 10px' }}>
+                <div className="empty-icon">💬</div>
+                <p>{t('noConversations')}</p>
+              </div>
+            ) : sortedConversations.map(conv => (
+              <div key={conv.id} className={`conversation-item ${activeConvId === conv.id ? 'active' : ''}`} onClick={() => selectConversation(conv)}>
+                <div className="conv-icon" style={{ background: (AGENT_COLORS[conv.agent_name] || '#6c5ce7') + '22', color: AGENT_COLORS[conv.agent_name] || '#6c5ce7' }}>
+                  {AGENT_ICONS[conv.agent_name] || '💬'}
+                </div>
+                <div className="conv-info">
+                  {renameId === conv.id ? (
+                    <input className="settings-input" value={renameTitle} onChange={e => setRenameTitle(e.target.value)}
+                      onBlur={() => handleRename(conv.id)} onKeyDown={e => e.key === 'Enter' && handleRename(conv.id)}
+                      autoFocus onClick={e => e.stopPropagation()} style={{ padding: '4px 8px', fontSize: '13px' }} />
+                  ) : <div className="conv-title">{conv.display_name}</div>}
+                  <div className="conv-agent">{conv.agent_name} {conv.is_pinned ? '📌' : ''}</div>
+                </div>
+                <div className="conv-actions">
+                  <button className="conv-action-btn" onClick={e => { e.stopPropagation(); setRenameId(conv.id); setRenameTitle(conv.display_name); }}>✏️</button>
+                  <button className="conv-action-btn" onClick={e => handlePin(conv.id, e)}>📌</button>
+                  <button className="conv-action-btn" onClick={e => handleClear(conv.id, e)}>🗑️</button>
+                  <button className="conv-action-btn danger" onClick={e => handleDelete(conv.id, e)}>✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="sidebar-footer">
+            <div className="user-info">
+              <div className="user-avatar">{userName?.charAt(0)?.toUpperCase() || 'U'}</div>
+              <div className="user-details">
+                <div className="user-name">{userName}</div>
+                <div className="user-role">{t('activeAgent')}: {activeAgent}</div>
+              </div>
+            </div>
+            <div className="sidebar-footer-actions">
+              <ThemeSwitcher />
+              <button className="footer-btn" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>🌐 {lang === 'en' ? 'عربي' : 'EN'}</button>
+              <button className="footer-btn" onClick={() => navigate('/settings')}>⚙️</button>
+              <button className="footer-btn danger" onClick={handleLogout}>🚪</button>
             </div>
           </div>
-          <div className="sidebar-footer-actions">
-            <ThemeSwitcher />
-            <button className="footer-btn" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>🌐 {lang === 'en' ? 'عربي' : 'EN'}</button>
-            <button className="footer-btn" onClick={() => navigate('/settings')}>⚙️</button>
-            <button className="footer-btn danger" onClick={handleLogout}>🚪</button>
-          </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
       {/* MAIN */}
       <main className="app-main">
         <div className="chat-header">
+          {fullscreen && <button className="fullscreen-back-btn" onClick={() => setFullscreen(false)}>← Back</button>}
           <div className="agent-selector">
-            {(agents.length ? agents : ['chat', 'code', 'data', 'research', 'planner', 'media']).map((a) => (
+            {(agents.length ? agents : ['chat', 'code', 'data', 'research', 'planner', 'media']).map(a => (
               <button key={a} className={`agent-chip ${activeAgent === a ? 'active' : ''}`}
                 onClick={async () => { setActiveAgent(a); try { await api.switchAgent(a); } catch {} }}>
                 {AGENT_ICONS[a]} {a}
@@ -310,25 +329,34 @@ export default function ChatPage() {
             ))}
           </div>
           <div className="chat-header-actions">
-            <button className="header-action-btn" onClick={() => setCmdOpen(true)} title="Ctrl+K">🔍</button>
+            <MessageSearch messages={messages} onJumpTo={handleJumpToMessage} />
+            <ChatInfoPanel messages={messages} activeAgent={activeAgent} conversationId={activeConvId} />
+            <button className="header-action-btn" onClick={() => setPromptOpen(true)} title="Prompt Templates (Ctrl+P)">📝</button>
+            <button className="header-action-btn" onClick={() => setCmdOpen(true)} title="Commands (Ctrl+K)">🔍</button>
+            <button className="header-action-btn" onClick={() => setFullscreen(prev => !prev)} title="Fullscreen (F11)">
+              {fullscreen ? '🔲' : '⛶'}
+            </button>
           </div>
         </div>
 
-        <div className="chat-messages">
+        <div className="chat-messages" id="chat-messages">
           {messages.length === 0 && !streaming ? (
             <div className="welcome-screen">
               <div className="welcome-icon">🤖</div>
               <h2>{t('welcome')}</h2>
               <p>{t('welcomeMessage')}</p>
               <div className="quick-actions">
-                {['Explain quantum computing', 'Write a Python script', 'Analyze this dataset'].map((q) => (
+                {['Explain quantum computing', 'Write a Python script', 'Analyze this dataset'].map(q => (
                   <button key={q} className="quick-action-btn" onClick={() => { setInput(q); setTimeout(() => inputRef.current?.focus(), 0); }}>{q}</button>
                 ))}
               </div>
+              <button className="prompt-templates-cta" onClick={() => setPromptOpen(true)}>
+                📝 Browse Prompt Templates
+              </button>
             </div>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className={`message ${msg.role}`}>
+              <div key={i} className={`message ${msg.role}`} id={`msg-${i}`}>
                 <div className="message-avatar">{msg.role === 'user' ? '👤' : (AGENT_ICONS[activeAgent] || '🤖')}</div>
                 <div className="message-body">
                   <div className="message-content">
@@ -365,16 +393,17 @@ export default function ChatPage() {
           <div className="chat-input-wrapper">
             <VoiceInput onResult={handleVoiceResult} disabled={loading} />
             <textarea ref={inputRef} className="chat-input" placeholder={t('typeMessage')} value={input}
-              onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} rows={1} />
+              onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} rows={1} />
             <button className="send-btn" onClick={handleSend} disabled={loading || !input.trim()}>➤</button>
           </div>
           <div className="chat-input-hint">
-            <span>💡 Ctrl+K for commands · Enter to send · Shift+Enter for new line</span>
+            <span>💡 Ctrl+K commands · Ctrl+P templates · F11 fullscreen · Enter send</span>
           </div>
         </div>
       </main>
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onCommand={handleCommand} />
+      {promptOpen && <PromptTemplates onSelect={text => { setInput(text); setTimeout(() => inputRef.current?.focus(), 0); }} onClose={() => setPromptOpen(false)} />}
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </div>
   );
