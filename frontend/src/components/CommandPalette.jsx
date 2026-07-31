@@ -5,6 +5,7 @@ const COMMANDS = [
   { id: 'new-chat', icon: '💬', label: 'New Chat', action: 'newChat', category: 'Chat' },
   { id: 'clear-chat', icon: '🗑️', label: 'Clear Chat', action: 'clearChat', category: 'Chat' },
   { id: 'prompt-templates', icon: '📝', label: 'Prompt Templates', action: 'promptTemplates', category: 'Chat' },
+  { id: 'shortcuts', icon: '⌨️', label: 'Keyboard Shortcuts', action: 'shortcuts', category: 'Chat' },
   { id: 'fullscreen', icon: '⛶', label: 'Toggle Fullscreen', action: 'fullscreen', category: 'Chat' },
   { id: 'switch-chat', icon: '💬', label: 'Switch to ChatBot', action: 'switchChat', category: 'Agents', agent: 'chat' },
   { id: 'switch-code', icon: '💻', label: 'Switch to CodeBot', action: 'switchAgent', category: 'Agents', agent: 'code' },

@@ -12,6 +12,12 @@ import PromptTemplates from '../components/PromptTemplates';
 import MessageSearch from '../components/MessageSearch';
 import ChatInfoPanel from '../components/ChatInfoPanel';
 import UsageStats from '../components/UsageStats';
+import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp';
+import JumpToBottom from '../components/JumpToBottom';
+import TypingIndicator from '../components/TypingIndicator';
+import MessageReactions from '../components/MessageReactions';
+import WelcomeScreen from '../components/WelcomeScreen';
+import ConversationTimer from '../components/ConversationTimer';
 import { exportAsMarkdown, exportAsJson } from '../utils/export';
 
 const AGENT_ICONS = { chat: '💬', code: '💻', data: '📊', research: '🔍', planner: '📋', media: '🎨' };
@@ -37,9 +43,13 @@ export default function ChatPage() {
   const [dragFiles, setDragFiles] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [toast, setToast] = useState(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [reactions, setReactions] = useState({});
+  const [convStartedAt, setConvStartedAt] = useState(null);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const chatMessagesRef = useRef(null);
 
   useEffect(() => { loadData(); }, []);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, streaming]);
@@ -49,12 +59,23 @@ export default function ChatPage() {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setCmdOpen(prev => !prev); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); setPromptOpen(prev => !prev); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f' && e.shiftKey) {
+        e.preventDefault();
+        document.querySelector('.search-toggle-btn')?.click();
+      }
       if (e.key === 'F11') { e.preventDefault(); setFullscreen(prev => !prev); }
-      if (e.key === 'Escape' && fullscreen) { setFullscreen(false); }
+      if (e.key === 'Escape') {
+        if (fullscreen) setFullscreen(false);
+        if (shortcutsOpen) setShortcutsOpen(false);
+      }
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        setShortcutsOpen(prev => !prev);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [fullscreen]);
+  }, [fullscreen, shortcutsOpen]);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -77,6 +98,7 @@ export default function ChatPage() {
 
   const selectConversation = async (conv) => {
     setActiveConvId(conv.id);
+    setConvStartedAt(conv.created_at || new Date().toISOString());
     try {
       const data = await api.getConversation(conv.id);
       setMessages(data.messages || []);
@@ -88,6 +110,7 @@ export default function ChatPage() {
     try { await api.newConversation(activeAgent); } catch {}
     setActiveConvId(null);
     setMessages([]);
+    setConvStartedAt(new Date().toISOString());
   };
 
   const handleSend = async () => {
@@ -212,8 +235,27 @@ export default function ChatPage() {
       case 'exportJson': exportAsJson(messages, activeConvId ? `Chat ${activeConvId}` : 'New Chat'); showToast('Exported as JSON'); break;
       case 'promptTemplates': setPromptOpen(true); break;
       case 'fullscreen': setFullscreen(prev => !prev); break;
+      case 'shortcuts': setShortcutsOpen(true); break;
       case 'usageStats': break; // handled separately
     }
+  };
+
+  const handleReact = (msgIndex, emoji) => {
+    setReactions(prev => {
+      const key = `${msgIndex}`;
+      const current = prev[key] || {};
+      const count = current[emoji] || 0;
+      return { ...prev, [key]: { ...current, [emoji]: count + 1 } };
+    });
+  };
+
+  const handleSuggestion = (text, agent) => {
+    if (agent) {
+      setActiveAgent(agent);
+      api.switchAgent(agent).catch(() => {});
+    }
+    setInput(text);
+    setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   const handleFileUploaded = (file) => {
@@ -329,31 +371,20 @@ export default function ChatPage() {
             ))}
           </div>
           <div className="chat-header-actions">
+            {convStartedAt && <ConversationTimer startedAt={convStartedAt} />}
             <MessageSearch messages={messages} onJumpTo={handleJumpToMessage} />
             <ChatInfoPanel messages={messages} activeAgent={activeAgent} conversationId={activeConvId} />
             <button className="header-action-btn" onClick={() => setPromptOpen(true)} title="Prompt Templates (Ctrl+P)">📝</button>
-            <button className="header-action-btn" onClick={() => setCmdOpen(true)} title="Commands (Ctrl+K)">🔍</button>
+            <button className="header-action-btn" onClick={() => setShortcutsOpen(true)} title="Shortcuts (?)">⌨️</button>
             <button className="header-action-btn" onClick={() => setFullscreen(prev => !prev)} title="Fullscreen (F11)">
               {fullscreen ? '🔲' : '⛶'}
             </button>
           </div>
         </div>
 
-        <div className="chat-messages" id="chat-messages">
+        <div className="chat-messages" id="chat-messages" ref={chatMessagesRef}>
           {messages.length === 0 && !streaming ? (
-            <div className="welcome-screen">
-              <div className="welcome-icon">🤖</div>
-              <h2>{t('welcome')}</h2>
-              <p>{t('welcomeMessage')}</p>
-              <div className="quick-actions">
-                {['Explain quantum computing', 'Write a Python script', 'Analyze this dataset'].map(q => (
-                  <button key={q} className="quick-action-btn" onClick={() => { setInput(q); setTimeout(() => inputRef.current?.focus(), 0); }}>{q}</button>
-                ))}
-              </div>
-              <button className="prompt-templates-cta" onClick={() => setPromptOpen(true)}>
-                📝 Browse Prompt Templates
-              </button>
-            </div>
+            <WelcomeScreen onSuggestion={handleSuggestion} onTemplates={() => setPromptOpen(true)} />
           ) : (
             messages.map((msg, i) => (
               <div key={i} className={`message ${msg.role}`} id={`msg-${i}`}>
@@ -363,6 +394,7 @@ export default function ChatPage() {
                     <MessageContent content={msg.content} isUser={msg.role === 'user'} />
                   </div>
                   <MessageActions content={msg.content} isUser={msg.role === 'user'} />
+                  {msg.role === 'assistant' && <MessageReactions reactions={reactions[i] || {}} onReact={(emoji) => handleReact(i, emoji)} />}
                 </div>
               </div>
             ))
@@ -379,13 +411,9 @@ export default function ChatPage() {
             </div>
           )}
           {loading && !streaming && (
-            <div className="message assistant">
-              <div className="message-avatar">{AGENT_ICONS[activeAgent] || '🤖'}</div>
-              <div className="message-content">
-                <div className="typing-indicator"><span></span><span></span><span></span></div>
-              </div>
-            </div>
+            <TypingIndicator agentName={activeAgent} agentIcon={AGENT_ICONS[activeAgent] || '🤖'} />
           )}
+          <JumpToBottom containerRef={chatMessagesRef} targetRef={messagesEndRef} />
           <div ref={messagesEndRef} />
         </div>
 
@@ -397,13 +425,14 @@ export default function ChatPage() {
             <button className="send-btn" onClick={handleSend} disabled={loading || !input.trim()}>➤</button>
           </div>
           <div className="chat-input-hint">
-            <span>💡 Ctrl+K commands · Ctrl+P templates · F11 fullscreen · Enter send</span>
+            <span>💡 Ctrl+K commands · Ctrl+P templates · ? shortcuts · F11 fullscreen</span>
           </div>
         </div>
       </main>
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onCommand={handleCommand} />
       {promptOpen && <PromptTemplates onSelect={text => { setInput(text); setTimeout(() => inputRef.current?.focus(), 0); }} onClose={() => setPromptOpen(false)} />}
+      {shortcutsOpen && <KeyboardShortcutsHelp onClose={() => setShortcutsOpen(false)} />}
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </div>
   );
