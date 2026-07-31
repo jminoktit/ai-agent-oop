@@ -28,6 +28,7 @@ AGENT_NAME_TO_KEY = {
 AGENT_KEY_TO_NAME = {v: k for k, v in AGENT_NAME_TO_KEY.items()}
 
 
+@csrf_exempt
 def login_view(request):
     if request.method == "POST":
         # JSON API (React frontend)
@@ -38,6 +39,9 @@ def login_view(request):
                 password = data.get("password", "")
             except (json.JSONDecodeError, TypeError):
                 return JsonResponse({"error": "Invalid request body"}, status=400)
+
+            if not username or not password:
+                return JsonResponse({"error": "Username and password are required"}, status=400)
 
             user = authenticate(request, username=username, password=password)
             if user is not None:
@@ -57,6 +61,7 @@ def login_view(request):
     return render(request, "agent_app/login.html", {"form": form})
 
 
+@csrf_exempt
 def register_view(request):
     if request.method == "POST":
         # JSON API (React frontend)
@@ -68,6 +73,9 @@ def register_view(request):
                 password2 = data.get("password2", "")
             except (json.JSONDecodeError, TypeError):
                 return JsonResponse({"error": "Invalid request body"}, status=400)
+
+            if not username or not password1:
+                return JsonResponse({"error": "Username and password are required"}, status=400)
 
             if password1 != password2:
                 return JsonResponse({"error": "Passwords do not match"}, status=400)
