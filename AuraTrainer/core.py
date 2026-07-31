@@ -11,14 +11,13 @@ from typing import Any, Dict, List, Optional
 import torch
 
 from AuraTrainer.utils.logger import get_logger
-from AuraTrainer.utils.gpu import GPUManager, GPUConfig, auto_configure
+from AuraTrainer.utils.gpu import GPUConfig, auto_configure
 from AuraTrainer.models.loader import ModelLoader
 from AuraTrainer.models.lora import LoRAConfigurator
 from AuraTrainer.data.loader import DatasetLoader
 from AuraTrainer.data.formatter import DatasetFormatter
 from AuraTrainer.data.sampler import DatasetSampler
-from AuraTrainer.training.trainer import AuraTrainer as Trainer
-from AuraTrainer.training.callbacks import PerformanceCallback, MemoryCallback
+from AuraTrainer.training.trainer import QLoRATrainer
 
 logger = get_logger("AuraTrainer.Core")
 
@@ -28,7 +27,8 @@ class TrainingConfig:
     """Training configuration dataclass."""
     model_name: str = "google/gemma-2-2b-it"
     dataset_size: int = 100000
-    batch_size: int = 10000
+    batch_size: int = 2
+    gradient_accumulation_steps: int = 8
     num_epochs: int = 3
     learning_rate: float = 2e-4
     max_seq_length: int = 1024
@@ -58,12 +58,21 @@ class AuraTrainer:
         self.trainer = None
 
         # Initialize components
-        self.gpu_manager = GPUManager()
         self.model_loader = None
         self.lora_configurator = None
-        self.dataset_loader = DatasetLoader()
+        self.dataset_loader = DatasetLoader(streaming=False)
         self.data_formatter = DatasetFormatter()
         self.data_sampler = DatasetSampler()
+
+    def _login_huggingface(self) -> None:
+        """Login to HuggingFace if token is provided."""
+        if self.config.hf_token:
+            try:
+                from huggingface_hub import login
+                login(token=self.config.hf_token)
+                logger.info("Logged in to HuggingFace!")
+            except Exception as e:
+                logger.warning(f"HuggingFace login failed: {e}")
 
     def detect_gpu(self) -> GPUConfig:
         """Detect and configure GPU.
@@ -72,6 +81,14 @@ class AuraTrainer:
             GPU configuration.
         """
         self.gpu_config = auto_configure()
+
+        # Update config based on GPU capabilities
+        if self.gpu_config:
+            self.config.batch_size = self.gpu_config.per_device_batch_size
+            self.config.gradient_accumulation_steps = self.gpu_config.gradient_accumulation_steps
+            logger.info(f"Updated config: batch_size={self.config.batch_size}, "
+                       f"grad_accum={self.config.gradient_accumulation_steps}")
+
         return self.gpu_config
 
     def load_model(self) -> None:
@@ -170,8 +187,8 @@ class AuraTrainer:
 
         training_config = {
             "num_train_epochs": self.config.num_epochs,
-            "per_device_train_batch_size": 2,
-            "gradient_accumulation_steps": 8,
+            "per_device_train_batch_size": self.config.batch_size,
+            "gradient_accumulation_steps": self.config.gradient_accumulation_steps,
             "learning_rate": self.config.learning_rate,
             "warmup_steps": 100,
             "logging_steps": 10,
@@ -187,7 +204,7 @@ class AuraTrainer:
             "max_length": self.config.max_seq_length,
         }
 
-        self.trainer = Trainer(
+        self.trainer = QLoRATrainer(
             model=self.model,
             tokenizer=self.tokenizer,
             train_dataset=dataset,
@@ -253,29 +270,37 @@ class AuraTrainer:
         logger.info("AuraTrainer - Starting Training Pipeline")
         logger.info("=" * 60)
 
-        # Detect GPU
-        self.detect_gpu()
+        try:
+            # Login to HuggingFace
+            self._login_huggingface()
 
-        # Load model
-        self.load_model()
+            # Detect GPU
+            self.detect_gpu()
 
-        # Apply LoRA
-        self.apply_lora()
+            # Load model
+            self.load_model()
 
-        # Load dataset
-        dataset = self.load_dataset()
+            # Apply LoRA
+            self.apply_lora()
 
-        # Train
-        metrics = self.train(dataset)
+            # Load dataset
+            dataset = self.load_dataset()
 
-        # Save model
-        self.save_model()
+            # Train
+            metrics = self.train(dataset)
 
-        # Send notification
-        self.send_notification(metrics)
+            # Save model
+            self.save_model()
 
-        logger.info("=" * 60)
-        logger.info("Training pipeline completed!")
-        logger.info("=" * 60)
+            # Send notification
+            self.send_notification(metrics)
 
-        return metrics
+            logger.info("=" * 60)
+            logger.info("Training pipeline completed!")
+            logger.info("=" * 60)
+
+            return metrics
+
+        except Exception as e:
+            logger.error(f"Training pipeline failed: {e}")
+            raise

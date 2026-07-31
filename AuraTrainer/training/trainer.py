@@ -20,7 +20,7 @@ from AuraTrainer.utils.gpu import GPUConfig
 logger = get_logger("AuraTrainer.Trainer")
 
 
-class AuraTrainer:
+class QLoRATrainer:
     """Main training orchestrator for AuraBook QLoRA fine-tuning."""
 
     def __init__(
