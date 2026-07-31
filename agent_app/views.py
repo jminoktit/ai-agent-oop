@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
 from .agents import AgentOrchestrator
-from .models import Conversation, Message, UploadedFile
+from .models import Conversation, Message, UploadedFile, TrainingJob
 from .tools import RuleEngine
 
 rule_engine = RuleEngine()
